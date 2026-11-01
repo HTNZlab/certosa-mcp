@@ -1,6 +1,6 @@
 # Biblioteca di prova collegata alla chat
 
-Versione 0.0.2-alpha.2, 1 novembre 2026. Laboratorio locale funzionante, distinto
+Versione 0.0.2-alpha.3, 1 novembre 2026. Laboratorio locale funzionante, distinto
 dalla PWA pubblica e dalle integrazioni negli account ChatGPT, Claude e Grok.
 
 ## Aprire la prova preparata sul computer dell'owner
@@ -10,7 +10,7 @@ Usa un profilo browser dedicato sul progetto H, diverso sia da Chrome personale
 sia dalle revisioni della biblioteca già consegnate. Al primo ingresso scegliere
 la propria password locale. Poi premere **Chat**, accanto a Menu (in alto nel quaderno, in basso a destra
 nella stanza), e scegliere Collega per
-15 minuti. Viene autorizzato soltanto il quaderno «Usi Interessanti».
+15 minuti. Il pannello resta aperto e mostra la conferma del collegamento. Viene autorizzato soltanto il quaderno «Usi Interessanti».
 
 Se manca l’abbinamento, il pulsante Chat resta presente e spiega come riaprire
 la prova. La voce del menu è ora la prima, sempre presente. Per aggiornare una
@@ -30,14 +30,21 @@ Esempi di richieste:
 - «Usa una volta la credenziale Servizio di prova, senza mostrarla.»
 
 Per l'ultima richiesta, prima scegliere nel medesimo pannello **Crea credenziale
-fittizia**. Il valore viene generato nel browser, conservato nel quaderno
+fittizia** e attendere **Credenziale fittizia pronta per un solo uso**: il pannello
+resta aperto, mostra avanzamento ed eventuali errori. Dopo l’uso mostra l’esito;
+**Prepara un altro uso** autorizza una nuova prova senza rigenerare il valore già
+salvato. Se si riavvia il computer, riaprire il medesimo launcher e ricollegare
+la biblioteca: il sito pubblico non avvia questo laboratorio.
+Il valore viene generato nel browser, conservato nel quaderno
 classificato «Passwords (prova)» dentro l'archivio cifrato, e non visualizzato.
 L'esecutore invia il valore solo al servizio di autenticazione locale di prova.
 Alla chat tornano un handle monouso e, dopo l'uso, soltanto uno stato fisso.
 
 **Revoca** chiude l'accesso. Chiudere/bloccare l'archivio o sostituirlo invalida
 la sessione; riaprirlo non riattiva l'accesso precedente. Un browser sospeso può
-risultare non disponibile. Nessuna copia dei quaderni è tenuta nel servizio.
+risultare non disponibile. Nessuna copia dei quaderni è tenuta nel servizio. Prima di ogni richiesta il server
+MCP rilegge l’abbinamento locale per riconoscere un servizio riavviato, mantenendo
+fissa la destinazione. Le richieste già inviate non sono ripetute automaticamente.
 
 ## Scrittura e ripristino
 

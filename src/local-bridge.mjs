@@ -102,5 +102,5 @@ await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(s
 const origin='http://127.0.0.1:'+server.address().port;
 fs.writeFileSync(path.join(runtime,'pairing.json'),JSON.stringify({origin,clientToken}),{mode:0o600});
 fs.writeFileSync(path.join(runtime,'browser-launch.json'),JSON.stringify({url:origin+'/api/lab/start#certosa-pair='+browserToken}),{mode:0o600});
-fs.writeFileSync(path.join(runtime,'ready.json'),JSON.stringify({origin,pid:process.pid,version:'0.0.2-alpha.2',instanceId}));
+fs.writeFileSync(path.join(runtime,'ready.json'),JSON.stringify({origin,pid:process.pid,version:'0.0.2-alpha.3',instanceId}));
 process.on('SIGTERM',()=>{failJobs();server.close();process.exit(0);});

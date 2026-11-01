@@ -1,6 +1,6 @@
 {
   "name": "certosa-mcp",
-  "version": "0.0.2-alpha.2",
+  "version": "0.0.2-alpha.3",
   "description": "Local stdio MCP connector for the isolated Certosa test library, with encrypted writes and a non-disclosing fictional credential demo.",
   "type": "module",
   "license": "MIT",

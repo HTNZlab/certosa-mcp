@@ -12,8 +12,8 @@ const knownErrors=new Set(['REVISION_CONFLICT','ARCHIVE_BUSY','ARCHIVE_LOCKED','
 const error=code=>{throw Object.assign(Error(code),{code});};
 async function request(route,data,signal){
   const response=await fetch(route,{method:data===undefined?'GET':'POST',headers:{Authorization:'Bearer '+pairing,'X-Certosa-Session':lease||'','Content-Type':'application/json'},
-    body:data===undefined?undefined:JSON.stringify(data),cache:'no-store',redirect:'error',signal});
-  if(!response.ok)error('DEVICE_UNAVAILABLE');return response.json();
+    body:data===undefined?undefined:JSON.stringify(data),cache:'no-store',redirect:'error',signal:signal||AbortSignal.timeout(10000)});
+  if(!response.ok)error(response.status===401?'PAIRING_REQUIRED':response.status===403?'SESSION_CLOSED':'DEVICE_UNAVAILABLE');return response.json();
 }
 function locked(){return typeof lib==='undefined'||!lib||Store.chiuso||!Cripto.attiva||!Store.protetto;}
 function busy(){return writing||Store.rekeying||Store.pendingWrites>0||!!saveTimer||window.certosaImportBusy||Book.animating||!!document.querySelector('.modal.on');}
@@ -88,7 +88,10 @@ const vaultId='certosa-lab-private-credential';
 function entry(){return lib.notebooks.find(n=>n.id===vaultId&&n.sensitivity==='secret')?.localCredential;}
 async function makeFictionalCredential(){
   await settle();
+  status.dataset.credentialState='saving';
+  status.textContent='Preparo e salvo la credenziale fittizia sul dispositivo…';
   if(!entry()){
+    if(lib.notebooks.some(n=>n.id===vaultId))error('INVALID_VAULT');
     const candidate=structuredClone(lib),sid='certosa-lab-private-series';
     candidate.series.push({id:sid,label:'Passwords (prova)',color:'#455971',strip:'#d9b875',created:Date.now(),issuedVolume:1});
     const secret=Array.from(crypto.getRandomValues(new Uint8Array(32)),b=>b.toString(16).padStart(2,'0')).join('');
@@ -96,12 +99,20 @@ async function makeFictionalCredential(){
       pages:[null,{html:htmlText('Credenziale fittizia gestita localmente. Il valore non viene visualizzato.'),st:[],notes:[]}],
       localCredential:{id:'fictional-service',label:'Servizio di prova',secret}});
     blockEditing(true);
-    try{if(!await Store.save(candidate))error('SAVE_FAILED');lib.series=candidate.series;lib.notebooks=candidate.notebooks;}
+    try{
+      if(!await Store.save(candidate))error('SAVE_FAILED');
+      lib.series=candidate.series;lib.notebooks=candidate.notebooks;
+      if(Book.nb)Book.nb=lib.notebooks.find(n=>n.id===Book.nb.id)||null;
+    }
     finally{blockEditing(false);}
-    Room.fill();
   }
+  if(closed)error('SESSION_CLOSED');
+  status.dataset.credentialState='registering';
+  status.textContent='Credenziale salvata. Preparo il servizio locale di prova…';
   // Explicit lab-only mapping from a logical HTTPS origin to this loopback fixture.
-  await request('/fixture/enrol',{secret:entry().secret});
+  const enrolled=await request('/fixture/enrol',{secret:entry().secret});
+  if(enrolled.status!=='ready')error('ENROLMENT_FAILED');
+  if(closed)error('SESSION_CLOSED');
   secretSession?.close();
   secretSession=createLocalSecretCapabilities({
     readState:()=>({contextId:config.libraryId,locked:locked()||closed||lib!==archiveReference}),
@@ -111,12 +122,18 @@ async function makeFictionalCredential(){
       return {status:result.status};
     }
   }).openSession({contextId:config.libraryId,bindings:[{credentialId:'fictional-service',label:'Servizio di prova',action:'authenticate',targetOrigin:'https://certosa-fixture.invalid',maxUses:1}]});
+  status.dataset.credentialState='ready';
   status.textContent='Credenziale fittizia pronta per un solo uso. Il valore resta escluso dalla chat.';
+  dialog.querySelector('#certosaFixture').textContent='Prepara un altro uso';
+  toast('Credenziale fittizia pronta: chiedi alla chat di usare Servizio di prova.');
+  // Refreshing a background shelf is not part of creating a valid capability.
+  // A rendering problem must not discard a credential already saved/enrolled.
+  try{Room.fill();}catch{}
 }
 async function revoke(){
   generation++;closed=true;session?.close();secretSession?.close();consumed.clear();lastEdit=null;
   try{if(lease)await request('/bridge/disconnect',{});}catch{}
-  lease=null;status.textContent='Collegamento revocato.';
+  lease=null;status.dataset.credentialState='unavailable';status.textContent='Collegamento revocato.';
 }
 async function poll(ownGeneration){
   while(!closed&&ownGeneration===generation){
@@ -134,6 +151,10 @@ async function poll(ownGeneration){
           if(job.name==='apply_proposal')result=await apply(job.arguments);
           else if(['prepare_credential_use','use_credential'].includes(job.name)){
             if(!secretSession)error('NOT_AVAILABLE');result=await secretSession[job.name](job.arguments);
+            if(job.name==='use_credential'){
+              status.dataset.credentialState='used';
+              status.textContent=result.status==='completed'?'Accesso di prova riuscito. La credenziale è stata usata senza mostrarne il valore.':'Uso della credenziale non completato. Prepara un altro uso prima di riprovare.';
+            }
           }else result=await session[job.name](job.arguments);
         }catch(e){result={error:knownErrors.has(e.code)?e.code:'OPERATION_FAILED'};}
         await request('/bridge/result',{id:job.id,result});
@@ -146,13 +167,14 @@ async function connect(){
   await settle();
   // A marker stored by the native test-library bootstrap prevents personal archives.
   const marker=await new Promise((resolve,reject)=>{const q=Store.db.transaction('kv','readonly').objectStore('kv').get('certosa-lab-id');q.onsuccess=()=>resolve(q.result);q.onerror=()=>reject(q.error);});
-  if(marker!==config.libraryId||!lib.notebooks.some(n=>n.id===config.notebookId))error('FORBIDDEN');
+  if(marker!==config.libraryId||!lib.notebooks.some(n=>n.id===config.notebookId))error('WRONG_LIBRARY');
   session?.close();secretSession?.close();secretSession=null;consumed.clear();lastEdit=null;archiveReference=lib;
   const owner=createLocalNotebookTools({readState,plainText:html=>JsonExport.content(html).text,isSystemNotebook:nb=>BuiltinManual.is(nb),
     searchEntries:(entries,query)=>{const parsed=CertosaSearchEngine.parse(query);if(parsed.error)error('INVALID_EDIT');return CertosaSearchEngine.scan(entries,parsed);}});
   session=owner.openSession({archiveId:config.libraryId,notebookIds:[config.notebookId],permissions:['read','search','propose_edit'],ttlMs:900000});
   ({lease}=await request('/bridge/connect',{}));closed=false;connectedUntil=Date.now()+900000;generation++;
   status.textContent='Collegato per 15 minuti: lettura, ricerca e modifiche a Usi Interessanti. Revocabile qui.';
+  status.dataset.credentialState='unavailable';
   void poll(generation);
 }
 const dialog=document.createElement('dialog');dialog.id='certosaConnectorDialog';
@@ -160,11 +182,37 @@ dialog.style.cssText='max-width:440px;width:calc(100% - 36px);padding:18px;backg
 dialog.innerHTML='<h2 style="font-size:18px;margin:0 0 10px">Chat · biblioteca di prova</h2><p>Autorizzi soltanto il quaderno Usi Interessanti. Le modifiche sono salvate sul dispositivo con una copia precedente. Gli estratti richiesti saranno leggibili dalla chat.</p><p id="certosaConnectionStatus" role="status">Non collegato.</p><div style="display:flex;flex-wrap:wrap;gap:8px"><button id="certosaConnect">Collega per 15 minuti</button><button id="certosaRevoke">Revoca</button><button id="certosaUndo">Annulla ultima modifica chat</button><button id="certosaFixture">Crea credenziale fittizia</button><button id="certosaDialogClose">Chiudi</button></div>';
 dialog.querySelectorAll('button').forEach(b=>b.style.cssText='min-height:36px;padding:6px 9px;font:14px system-ui;cursor:pointer');
 const status=dialog.querySelector('#certosaConnectionStatus');
-function safeAction(fn){return ()=>{Promise.resolve().then(fn).catch(()=>{status.textContent='Operazione non disponibile: apri e sblocca la biblioteca di prova, poi riprova.';});};}
-dialog.querySelector('#certosaConnect').onclick=safeAction(async()=>{await connect();dialog.close();});
-dialog.querySelector('#certosaRevoke').onclick=safeAction(revoke);
+let uiPending=false;
+const messages={
+  SESSION_CLOSED:'Prima premi «Collega per 15 minuti», poi «Crea credenziale fittizia». La sessione può essere scaduta o revocata.',
+  ARCHIVE_LOCKED:'Completa l’ingresso nella biblioteca protetta con la tua password locale, poi riprova.',
+  ARCHIVE_BUSY:'È in corso un salvataggio o un’altra operazione. Attendi il completamento e riprova.',
+  SAVE_FAILED:'Salvataggio non riuscito: la credenziale non è pronta. I quaderni precedenti sono conservati.',
+  WRONG_LIBRARY:'Questa biblioteca non contiene il quaderno di prova Usi Interessanti. Non è stata modificata.',
+  INVALID_VAULT:'Il quaderno riservato di prova ha dati inattesi. È stato conservato senza sostituirlo.',
+  ENROLMENT_FAILED:'La credenziale è salvata, ma il servizio locale non l’ha confermata. Riprova la preparazione.',
+  DEVICE_UNAVAILABLE:'Il servizio locale non risponde. Riapri Apri-Certosa-con-chat.cmd senza cancellare il profilo.',
+  PAIRING_REQUIRED:'Abbinamento locale scaduto: riapri Apri-Certosa-con-chat.cmd e ricollega la biblioteca.',
+  REVISION_CONFLICT:'La biblioteca è cambiata. L’operazione non è stata applicata: controlla il quaderno prima di riprovare.'
+};
+function syncControls(){
+  for(const id of ['certosaConnect','certosaFixture','certosaUndo'])dialog.querySelector('#'+id).disabled=uiPending||!config;
+  dialog.querySelector('#certosaRevoke').disabled=!config;
+}
+function reportError(e){
+  status.dataset.credentialState='error';
+  status.textContent=messages[e?.code]||'Operazione non completata. Il valore della credenziale non è stato mostrato. Controlla il collegamento e riprova.';
+}
+function safeAction(fn){return async()=>{
+  if(uiPending)return;
+  uiPending=true;dialog.setAttribute('aria-busy','true');syncControls();
+  try{await fn();}catch(e){reportError(e);}
+  finally{uiPending=false;dialog.removeAttribute('aria-busy');syncControls();}
+};}
+dialog.querySelector('#certosaConnect').onclick=safeAction(connect);
+dialog.querySelector('#certosaRevoke').onclick=async()=>{try{await revoke();}catch(e){reportError(e);}};
 dialog.querySelector('#certosaUndo').onclick=safeAction(undoLocal);
-dialog.querySelector('#certosaFixture').onclick=safeAction(async()=>{if(closed)error('SESSION_CLOSED');await makeFictionalCredential();dialog.close();});
+dialog.querySelector('#certosaFixture').onclick=safeAction(async()=>{if(closed)error('SESSION_CLOSED');await makeFictionalCredential();});
 dialog.querySelector('#certosaDialogClose').onclick=()=>dialog.close();
 document.body.append(dialog);
 function openPanel(event){
@@ -179,12 +227,10 @@ for(const [menuId,triggerId] of [['menuRoom','btnMenuRoom'],['menuDesk','btnMenu
   if(menu){const button=document.createElement('button');button.textContent='Collega alla chat · prova…';button.dataset.certosaConnector='open';button.onclick=openPanel;menu.prepend(button);}
   if(trigger){const button=document.createElement('button');button.type='button';button.className='btn quiet';button.textContent='Chat';button.title='Collega la biblioteca di prova alla chat';button.setAttribute('aria-label',button.title);button.dataset.certosaConnector='shortcut';button.style.minHeight='36px';button.onclick=openPanel;trigger.before(button);}
 }
-dialog.querySelector('#certosaConnect').disabled=true;
-dialog.querySelector('#certosaFixture').disabled=true;
+syncControls();
 if(pairing){
   try{
     config=await request('/bridge/config');
-    dialog.querySelector('#certosaConnect').disabled=false;
-    dialog.querySelector('#certosaFixture').disabled=false;
+    syncControls();
   }catch{status.textContent='Abbinamento locale non valido o servizio non disponibile. Riapri Apri-Certosa-con-chat.cmd nella cartella della prova.';}
 }else status.textContent='Questa finestra non è abbinata alla chat. Riapri Apri-Certosa-con-chat.cmd nella cartella della prova: i tuoi quaderni saranno conservati.';

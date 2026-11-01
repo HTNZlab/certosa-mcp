@@ -1,6 +1,6 @@
 # Certosa MCP — local test-library connector
 
-Version 0.0.2-alpha.2 implements a working **local stdio MCP server** backed by
+Version 0.0.2-alpha.3 implements a working **local stdio MCP server** backed by
 Certosa's real encrypted browser archive in an isolated test profile. It can
 search/read the authorised notebook, preview and persist page edits, and use a
 fictional credential against a loopback authentication fixture without returning
@@ -43,7 +43,7 @@ chat may need to reload its MCP configuration; verify its tool inventory.
 - Owner consent, expiry, revocation on archive lock/replacement, stale-edit rejection.
 - One-use fictional authentication, returning only an opaque handle and fixed status.
 
-27 domain unit tests pass. A separate 30-check full-app integration run checks real SDK
+27 domain unit tests pass. A separate 37-check full-app integration run checks real SDK
 client/server communication, browser persistence after reload, undo, conflicts,
 failed saves, consent/revocation and a generated credential excluded from the
 MCP transcript. These are synthetic headless tests, not physical-phone or

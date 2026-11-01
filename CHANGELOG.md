@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.0.2-alpha.3 — 2026-11-01
+
+- Refresh local pairing before dispatch after a bridge restart; keep the target pinned and never retry automatically.
+- Keep the connection panel open after connecting and preparing the fictional credential.
+- Show bounded progress, actionable errors and the fixed authentication outcome.
+- Preserve the open notebook reference after encrypted credential persistence.
+- Retry fixture preparation without duplicating or regenerating a stored credential.
+
 ## 0.0.2-alpha.2 — 2026-11-01
 
 - Always show a compact Chat button beside Menu in the room and notebook.
