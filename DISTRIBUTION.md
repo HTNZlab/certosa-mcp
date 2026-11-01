@@ -7,38 +7,25 @@ con il quaderno «Usi Interessanti», orientato a bisogni umani.
 
 ## Stato reale
 
-La versione0.0.3-alpha.2 aggiunge un motore autonomo per i file .certosa e un
-server MCP stdio. Scelta file, password e consenso sono locali su Windows;
-lettura/ricerca/conteggio/scrittura non richiedono l’app né il browser.
-Il formato corrente è mantenuto, con limiti sperimentali: non qualificato per
-archivi GB. Il laboratorio browser precedente è conservato in LIVE-LAB.md.
-Nessun accesso a provider, ponte remoto o submission è stato eseguito.
+Repository pubblico: [HTNZlab/certosa-mcp](https://github.com/HTNZlab/certosa-mcp).
+La prerelease 0.0.4-alpha.1 aggiunge il backend incrementale cifrato `.certosa-db`,
+conservando lettura/scrittura/export del formato `.certosa`. Solo il campo autore
+viene aggiunto. Importazione crea una copia, nessuna migrazione automatica.
+Quattordici strumenti MCP locali, scelta/password/consenso su Windows, copia
+cifrata consistente anche per archivi grandi. Dettagli e limiti nel README.
+Collaudo sintetico reale: 40.000 pagine e 1 GiB di media, checksum verificato;
+una pagina più autore scrivono circa 86 KB senza riscrivere i media.
 
-## Repository e distribuzione indipendente
+Distribuire soltanto sorgenti, contratti, test sintetici e documentazione.
+Non esportare archivi, credenziali, cronologia privata, profili, runtime o log.
+Release con pacchetto e checksum; codice MIT, dipendenze con proprie licenze.
+Non qualificati telefoni, account provider e integrazione nella PWA pubblica.
 
-Repository pubblico: [HTNZlab/certosa-mcp](https://github.com/HTNZlab/certosa-mcp),
-motore [v0.0.3-alpha.2](https://github.com/HTNZlab/certosa-mcp/releases/tag/v0.0.3-alpha.2).
-Pubblicati con storia nuova e manifest
-di esportazione esplicito. Licenza MIT del codice, notices delle dipendenze,
-README inglese e italiano, installazione, esempi, supporto, changelog, test e CI.
-Release versionate con checksum e istruzioni per aggiornare e rimuovere il
-connettore. Dichiarare chiaramente ambienti supportati e limitazioni mobile.
-
-Per una release generale: estendere il trasporto locale già funzionante con una
-connessione autorizzata agli archivi personali, consenso/classificazione sensibili
-completi e commit/ripristino delle collezioni.
-Testare un'installazione pulita su ogni piattaforma dichiarata. Non presentare
-il catalogo JSON attuale come se fosse già un server MCP.
-
-Esportare solo sorgenti, contratti, test sintetici strettamente necessari e
-documentazione dell'adattatore. Non pubblicare cronologia del repository
-privato, archivi `.certosa`, profili browser, contenuti del quaderno, chiavi,
-cache, database o log di lavoro. Gli esempi della biblioteca restano fuori Git.
-
-Il server locale può essere distribuito direttamente da GitHub per client
-compatibili. Per ChatGPT web o Claude web occorre il percorso remoto e il
-ponte al dispositivo; la biblioteca non deve diventare per questo un archivio
-persistente del gateway. Il modello vede gli estratti che vengono inoltrati.
+Il trasporto è MCP stdio locale. Non è un endpoint remoto per ChatGPT/Claude web.
+Questi richiedono un ponte autorizzato al dispositivo ancora da implementare;
+gli estratti richiesti diventano visibili al provider della chat. Nessuna
+submission o accesso ai portali provider è stato eseguito. Le indicazioni sotto
+sono quelle verificate il 1 novembre 2026, non un'approvazione dei cataloghi.
 
 ## OpenAI
 

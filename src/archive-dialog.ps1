@@ -1,4 +1,4 @@
-param([ValidateSet('choose','unlock','grant','notice')][string]$Mode)
+param([ValidateSet('choose','save','unlock','grant','notice')][string]$Mode)
 $ErrorActionPreference='Stop'
 [Console]::InputEncoding=[System.Text.UTF8Encoding]::new($false)
 [Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false)
@@ -18,15 +18,16 @@ try {
     [void][System.Windows.Forms.MessageBox]::Show($form,[string]$data.message,'Certosa · Archivio locale',[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Information)
     Reply @{acknowledged=$true};$form.Dispose();exit
   }
-  if($Mode -eq 'choose'){
-    $picker=New-Object System.Windows.Forms.OpenFileDialog
-    $picker.Title='Apri un archivio .certosa per la chat'
-    $picker.Filter='Archivi Certosa (*.certosa)|*.certosa'
+  if($Mode -eq 'choose' -or $Mode -eq 'save'){
+    $picker=if($Mode -eq 'save'){New-Object System.Windows.Forms.SaveFileDialog}else{New-Object System.Windows.Forms.OpenFileDialog}
+    $picker.Title=if($data.incrementalCopy){"Copia cifrata dell'archivio incrementale"}elseif($Mode -eq 'save'){'Esporta una copia .certosa compatibile'}elseif($data.importing){'Importa .certosa in una copia incrementale'}else{'Apri un archivio Certosa per la chat'}
+    $picker.Filter=if($data.incrementalCopy){'Archivi incrementali (*.certosa-db)|*.certosa-db'}elseif($data.incrementalAllowed){'Archivi Certosa (*.certosa;*.certosa-db)|*.certosa;*.certosa-db'}else{'Archivi Certosa (*.certosa)|*.certosa'}
     $picker.InitialDirectory=[string]$data.directory
-    $picker.CheckFileExists=$true;$picker.Multiselect=$false
+    if($Mode -eq 'save'){$ext=if($data.incrementalCopy){'.certosa-db'}else{'.certosa'};$picker.FileName='Copia-'+[guid]::NewGuid().ToString().Substring(0,8)+$ext;$picker.OverwritePrompt=$true}else{$picker.CheckFileExists=$true;$picker.Multiselect=$false}
     $form.Height=170
     $intro=New-Object System.Windows.Forms.Label
     $intro.Text='Scegli il file .certosa. Password e autorizzazione saranno richieste qui, sul dispositivo.'
+    if($data.incrementalCopy){$intro.Text="Copia completa cifrata. Mantiene la password dell'archivio; l'originale non viene modificato."}
     $intro.SetBounds(20,20,520,80);$form.Controls.Add($intro)
     $form.Show();$form.Activate()
     if($picker.ShowDialog($form) -eq [System.Windows.Forms.DialogResult]::OK){Reply @{path=$picker.FileName}}else{Reply @{cancelled=$true}}
@@ -41,16 +42,19 @@ try {
   $cancel.Text='Annulla';$cancel.SetBounds(435,345,105,36);$cancel.DialogResult=[System.Windows.Forms.DialogResult]::Cancel
   $form.Controls.AddRange(@($ok,$cancel));$form.AcceptButton=$ok;$form.CancelButton=$cancel
   if($Mode -eq 'unlock'){
+    $form.Height=570;$label.Height=205;$ok.Top=475;$cancel.Top=475
     $label.Text=if($data.encrypted){"Sblocca $($data.name).`r`nLa password viene usata soltanto sul dispositivo. Non viene inviata alla chat."}else{"$($data.name) non e protetto.`r`nScegli una password per cifrare i prossimi salvataggi nel formato Certosa attuale."}
+    if($data.exporting){$label.Text="Scegli la password della copia .certosa esportata.`r`nLa password resta sul dispositivo. Il file completo non viene mostrato alla chat."}
+    if($data.importing){$label.Text+="`r`nCreo una copia incrementale .certosa-db, con questa password. L'originale non viene modificato."}
     if($data.copyTo){$label.Text+="`r`nCopia di lavoro cifrata in $($data.copyTo). L'originale resta al suo posto."}
     if($data.retry){$label.Text+="`r`nSblocco non riuscito: controlla la password e riprova."}
     $box=New-Object System.Windows.Forms.TextBox
-    $box.SetBounds(20,140,520,30);$box.UseSystemPasswordChar=$true
+    $box.SetBounds(20,245,520,30);$box.UseSystemPasswordChar=$true
     $form.Controls.Add($box)
     $repeat=New-Object System.Windows.Forms.TextBox
-    $repeat.SetBounds(20,220,520,30);$repeat.UseSystemPasswordChar=$true
+    $repeat.SetBounds(20,325,520,30);$repeat.UseSystemPasswordChar=$true
     if(-not $data.encrypted){
-      $hint=New-Object System.Windows.Forms.Label;$hint.Text='Ripeti la password';$hint.SetBounds(20,190,520,25)
+      $hint=New-Object System.Windows.Forms.Label;$hint.Text='Ripeti la password';$hint.SetBounds(20,295,520,25)
       $form.Controls.AddRange(@($hint,$repeat))
     }
     $ok.Text='Sblocca in locale';$ok.Enabled=$false
@@ -65,7 +69,7 @@ try {
   $all.Text='Seleziona tutti i quaderni disponibili';$all.SetBounds(20,125,520,28)
   $list=New-Object System.Windows.Forms.CheckedListBox
   $list.SetBounds(20,158,520,140);$list.CheckOnClick=$true
-  foreach($notebook in $data.notebooks){[void]$list.Items.Add(($notebook.title+' · '+$notebook.volume),$false)}
+  foreach($notebook in $data.notebooks){$entry=$notebook.title+' · '+$notebook.volume;if($notebook.author){$entry+=' — '+$notebook.author};[void]$list.Items.Add($entry,$false)}
   $all.Add_CheckedChanged({for($i=0;$i -lt $list.Items.Count;$i++){$list.SetItemChecked($i,$all.Checked)}})
   $write=New-Object System.Windows.Forms.CheckBox
   $write.Text='Consenti anche le modifiche con copia di recupero cifrata';$write.SetBounds(20,305,520,30);$write.Checked=$true

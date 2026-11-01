@@ -1,113 +1,111 @@
-# Certosa MCP — standalone local archive engine
+# Certosa MCP — incremental local archive engine · 0.0.4-alpha.1
 
-Version **0.0.3-alpha.2** opens and edits `.certosa` files directly, without the
-Certosa application, browser, PWA or IndexedDB. Archives stay on the device.
-The existing CRTS2 format is retained: PBKDF2-SHA256, gzip before AES-256-GCM,
-and an authenticated header. No new storage format or archive migration.
+Read, search and edit local archives without opening Certosa or a browser.
+This release adds **author only**: readable, searchable and editable through a
+revision-bound proposal. Existing unknown metadata is preserved.
 
-## Install and configure
+## Formats and compatibility
 
-Requires Node.js22+. The local file/password/consent window currently requires
-Windows PowerShell and Windows Forms. Other operating systems fail closed for
-local unlock; they are not claimed supported by the desktop interaction flow.
-Set TEMP/TMP/TMPDIR and npm/Node caches inside your approved project first.
+- `.certosa` retains its current CRTS2 format and existing reader/writer.
+- `.certosa-db` is a separate encrypted working archive: individually compressed
+  pages, encrypted full-text index/history and immutable deduplicated 3 MiB media
+  chunks. Small edits update only the affected records.
+
+`import_archive` creates a separate incremental copy after local file selection
+and password entry. It preserves the original. `export_archive` creates a
+compatible `.certosa` copy within legacy limits: 256 MiB stored, 512 MiB expanded
+JSON, 10,000 pages/notebook, 100,000 page-array entries/archive. Oversized exports
+fail completely without dropping content. `backup_archive` instead creates a
+consistent encrypted `.certosa-db` snapshot, retaining its password; tested above
+1 GiB. Existing destinations are never overwritten. The current Certosa app does
+not directly open `.certosa-db`; export is needed for old-format interoperability.
+
+## Install and connect
+
+Node.js 22.13+, Windows PowerShell and Windows Forms. Verified on Windows x64
+with Node 22.23.4. The pinned native SQLite dependency includes prebuilds for
+this platform, so install scripts are unnecessary. Other platforms and physical
+phones are not qualified. Set TEMP/TMP/TMPDIR and npm/Node caches inside the
+approved project before installing or running.
 
 ```sh
 npm ci --ignore-scripts
 node src/archive-setup.mjs --project /absolute/project --out /absolute/project/certosa-archives
 ```
 
-The setup preserves existing runtimes. It prepares local Codex TOML/Claude JSON
-examples containing paths only. Configure an MCP stdio client with:
+Setup preserves existing runtimes and produces Codex TOML and Claude JSON
+examples containing paths only. Configure a local MCP stdio client with:
 
 ```json
 {"mcpServers":{"certosa_archives":{"command":"node","args":["/absolute/repo/src/archive-mcp-server.mjs","/absolute/project/certosa-archives/archive-engine.json"],"env":{"TEMP":"/absolute/project/certosa-archives/.tmp","TMP":"/absolute/project/certosa-archives/.tmp","TMPDIR":"/absolute/project/certosa-archives/.tmp","NODE_COMPILE_CACHE":"/absolute/project/certosa-archives/cache-node"}}}}
 ```
 
-Ask the chat to **open a Certosa archive**. `open_archive` responds immediately
-while a native local window asks you to select a `.certosa` file, unlock it and
-select the notebooks to authorise for15minutes. No notebooks are selected by
-default. Files inside the configured project are updated directly. For a selected file
-outside it, the local unlock window announces an encrypted working copy under
-<runtime>/archives. Edits affect that copy and leave the original untouched;
-even a historical clear export is encrypted before writing the working copy. The file
-password can differ from the browser library password. Historical clear exports
-are accepted with a locally chosen password protecting subsequent saves.
+Ask the chat to open or import a Certosa archive. The tool returns immediately
+while a native Windows window requests the file, password and notebook consent.
+No password or archive path is a tool argument. Consent lasts 15 minutes and can
+be read-only. Incremental files must be inside the configured project. Legacy
+files selected outside it use an encrypted working copy announced locally.
+`close_archive` releases the local key and revokes access.
 
-Passwords never enter tool arguments, results, URLs, logs or configuration.
-The native helper sends its result through an anonymous local pipe to the key
-derivator. Keys remain in the local service and are released on close/expiry.
-No Certosa app, browser profile or provider API key is needed for the engine.
-The service survives reconnecting a chat client. `close_archive` revokes access.
+System notebooks, trash, `sensitivity: secret` and `localCredential` notebooks
+are excluded. A title such as Passwords alone does not classify data: exclude
+unclassified credential notebooks locally. No personal credential executor is
+provided. Authorised requested excerpts are visible to the chat and its provider.
 
-## Tools
+## Fourteen tools
 
-- `open_archive`, `get_archive_status`, `close_archive`.
+- `open_archive`, `import_archive`, `get_archive_status`, `close_archive`.
 - `list_notebooks`, `read_notebook`, `search_notebooks`, `count_word`.
-- `prepare_edit`, `read_proposal`, `apply_proposal`.
+- `prepare_edit`, `prepare_author_edit`, `read_proposal`, `apply_proposal`.
+- `export_archive`, `backup_archive`.
 
-The model cannot pass a filesystem path or password to `open_archive`.
-Read/search/write scope is granted by the owner locally. A read-only option is
-available. System notebooks, trash and notebooks with `sensitivity: secret` or
-`localCredential` are excluded from generic tools. A title such as Passwords
-alone does not classify data: exclude unclassified credential notebooks from
-the local consent selection. No personal secret retrieval/use executor is
-provided by this archive engine. The old browser fixture demo remains separate.
+`count_word` computes exact whole-word totals in authorised pages and notes,
+excluding titles/trash. Returned locations are bounded; the total is exact.
+HTML is parsed as data; model edits insert escaped plain text. Prepare/review a
+proposal at the current revision before applying it. Never automatically retry
+a write after an uncertain outcome: read back first.
 
-`count_word` computes exact whole-word totals across authorised pages and notes,
-excluding titles and trash. Case-insensitive by default; locations are bounded
-but totals are exact. Search reuses Certosa's text search. HTML is parsed as data,
-never executed. Model edits supply escaped plain text rather than executable HTML.
+## Encryption and recovery
 
-## Writes and recovery
+The new backend uses SQLite3 Multiple Ciphers with non-legacy SQLCipher settings:
+AES-256-CBC/HMAC-SHA512, PBKDF2-SHA512 with 600,000 iterations, encrypted header,
+catalogue, media, FTS, history and WAL. SQL temporary storage stays in memory;
+there is no plaintext SQLite fallback. Legacy CRTS2 retains PBKDF2-SHA256 and
+gzip before AES-256-GCM. Passwords/keys stay in a separate local execution
+process. A failed executor requires a fresh unlock/consent, without write replay.
 
-Read the revision, prepare/review a proposal, then apply it once. Before commit,
-the engine checks source bytes, revision and permissions. A cooperative lock
-coordinates engine writers. It creates an encrypted recovery copy, writes and
-flushes an encrypted temporary file on the same filesystem, and replaces the
-original. Notes, attachments, unknown fields and excluded notebooks are preserved.
-The updated file can be read/imported by Certosa's existing format functions.
-An already-open browser database is not implicitly updated from this file.
+Transactions check revisions and retain the previous record in encrypted history.
+Restore is currently a local engine API, tested in an isolated copy, not an MCP
+tool. Restore itself creates a recovery point. Interrupted imports are never
+published as complete archives. No automatic history/media deletion is performed.
+Open databases may have `-wal`/`-shm` files: do not copy the main file alone while
+open. Use `backup_archive` for a consistent encrypted snapshot.
 
-Never automatically repeat a write after timeout or an uncertain outcome: read
-back first. Backups are retained; this release does not automatically delete them.
-The lock/hash checks do not provide collaborative editing with external programs
-that ignore the lock. A stale lock after a hard crash requires local verification;
-it is not silently removed. File operations remain inside the configured project.
-
-## Capacity and roadmap
-
-Experimental limits:256MiB file,512MiB expanded JSON,10,000pages/notebook and
-100,000page-array entries/archive. This is a compatibility release, not a GB-scale
-qualification. The current format authenticates/decrypts the whole payload and
-recompresses/re-encrypts the archive for each write; full recovery copies also
-consume space. Increasing a page-count constant does not solve those costs.
-
-Large illustrated books need work/edition metadata (authors, translators,
-illustrators, provenance/rights), semantic chapter anchors and image placements
-independent of reflowed page numbers. These catalogue features are not implemented.
-An incremental encrypted catalogue plus immutable encrypted media blocks is a
-candidate backend to benchmark. Original media should remain unchanged; derived
-previews are separate. No storage migration is performed in this release.
+Media originals remain byte-identical. Compression is selected when beneficial,
+without lossy transcoding. SQLite can occupy more space than the legacy format;
+the measured benefit is granular writes rather than a universal size reduction.
 
 ## Validation and boundaries
 
-50 domain/engine tests,23 SDK stdio-to-file checks and5 service boot/restart checks
-cover original-format interoperation, password/tamper rejection, local consent,
-scopes, exact counting, encrypted writes/recovery, field/media preservation,
-conflicts, failed replacement, lock/expiry, junction confinement and reconnects.
-All archives/credentials are synthetic. An owner run also completed native Windows file/password/consent and chat
-read/search/count/write with full readback on the authored sample. This remains
-separate from injected UI providers in automated tests. No physical-phone, GB-scale,
-provider-account, remote-web gateway or directory submission is claimed.
+66 domain/engine tests plus 23 legacy SDK checks, 19 incremental SDK checks and
+5 boot/restart checks cover encryption, incorrect passwords/tamper, scopes,
+concurrency, interrupted transactions/imports, recovery and native-format roundtrips.
+The heavy benchmark is separate from `npm test`: 10 synthetic notebooks, 40,000
+pages and a real 1 GiB pseudorandom media stream, fully read back with a checksum.
+A page plus author edit writes 86,552 bytes of WAL without changing media chunks;
+the optimised run peaked around 237 MiB RSS. These are PC/H-drive measurements,
+not mobile performance guarantees. Run `node --expose-gc tests/benchmark_large_archive.mjs`;
+set `CERTOSA_BENCHMARK_SNAPSHOT=1` to include a full encrypted snapshot.
 
 ```sh
 npm test
 ```
 
-The package contains source/contracts/docs only: no app, archive, browser profile,
-private history, pairing, runtime, password or content logs. Code is MIT; see LICENSE
-and dependency notices. Native crypto/search test support comes from Certosa.
-
-The earlier browser-based synthetic lab remains documented in [LIVE-LAB.md](LIVE-LAB.md).
-See [Italian guide](README.it.md) and [distribution/submission status](DISTRIBUTION.md).
+The owner previously verified the legacy Windows file/password/consent flow and
+file read/search/write. New import/backup flows use injected UI in automated
+tests and are not claimed owner-accepted. No power-loss, provider-account,
+remote gateway or directory submission qualification. The package contains no
+archive, runtime, browser profile, password or content log. Code is MIT;
+installed dependencies retain their own licences. The old synthetic browser lab
+remains in [LIVE-LAB.md](LIVE-LAB.md). See the [Italian guide](README.it.md) and
+[distribution/submission status](DISTRIBUTION.md).

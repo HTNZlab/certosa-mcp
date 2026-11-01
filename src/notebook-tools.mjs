@@ -38,7 +38,8 @@ export function createLocalNotebookTools({readState, plainText, searchEntries, i
     const eligible = s => s.lib.notebooks.filter(n => allowed.has(n.id) && !isSystemNotebook(n) && !isSensitiveNotebook(n));
     function find(s, id) { const nb = eligible(s).find(n => n.id === id); if (!nb) fail('NOT_FOUND'); return nb; }
     const title = (s, nb) => s.lib.series.find(series => series.id === nb.sid)?.label || '';
-    const metadata = (s, nb) => ({archiveId, notebookId: nb.id, seriesId: nb.sid, title: title(s, nb), volume: nb.vol, pageCapacity: nb.maxPages, revision: s.revision});
+    const author = (s,nb) => String(typeof nb.author==='string'?nb.author:typeof s.lib.series.find(x=>x.id===nb.sid)?.author==='string'?s.lib.series.find(x=>x.id===nb.sid).author:'').slice(0,500);
+    const metadata = (s, nb) => ({archiveId, notebookId: nb.id, seriesId: nb.sid, title: title(s, nb), author:author(s,nb), volume: nb.vol, pageCapacity: nb.maxPages, revision: s.revision});
     const source = value => value == null ? undefined : {
       kind: ['chat', 'manual', 'note', 'other'].includes(value.kind) ? value.kind : 'other',
       reference: text(value.reference, 1000),
@@ -81,7 +82,7 @@ export function createLocalNotebookTools({readState, plainText, searchEntries, i
       if (!integer(limit, 1, 50)) fail('INVALID_RANGE');
       const entries = [];
       for (const nb of eligible(s)) {
-        entries.push({nbId: nb.id, label: title(s, nb), page: 1, where: 'title', text: title(s, nb)});
+        entries.push({nbId: nb.id, label: title(s, nb), page: 1, where: 'title', text: title(s, nb)+(author(s,nb)?'\n'+author(s,nb):'')});
         nb.pages.forEach((p, page) => {
           if (!page || !p) return;
           entries.push({nbId: nb.id, page, where: 'page', text: plainText(p.html || '')});
@@ -147,7 +148,13 @@ export function createLocalNotebookTools({readState, plainText, searchEntries, i
       for (const operation of p.operations) if (operation.notebookId) find(s, operation.notebookId);
       return {...clone(p), stale: s.revision !== p.baseRevision, currentRevision: s.revision};
     }
-    return Object.freeze({list_notebooks, read_notebook, search_notebooks, prepare_collection, prepare_edit, read_proposal, close});
+    function prepare_author_edit({notebookId,baseRevision,author:value}){
+      const s=state('propose_edit'),nb=find(s,notebookId);
+      if(baseRevision!==s.revision)fail('REVISION_CONFLICT');
+      text(value,500,true);
+      return saveProposal(s,'propose_edit',[{type:'set_notebook_author',notebookId,beforeAuthor:author(s,nb),afterAuthor:value.trim()}]);
+    }
+    return Object.freeze({list_notebooks, read_notebook, search_notebooks, prepare_collection, prepare_edit, prepare_author_edit, read_proposal, close});
   }
   return Object.freeze({openSession});
 }

@@ -1,14 +1,16 @@
 {
   "name": "certosa-mcp",
-  "version": "0.0.3-alpha.2",
-  "description": "Local MCP archive engine for .certosa files: native local unlock, scoped reading/search/counting and encrypted writes without the Certosa app.",
+  "version": "0.0.4-alpha.1",
+  "description": "Local MCP engine for encrypted Certosa archives: incremental storage, author, scoped search/read/write and local unlock.",
   "type": "module",
   "license": "MIT",
   "exports": {
     ".": "./src/notebook-tools.mjs",
     "./secrets": "./src/secret-capabilities.mjs",
     "./archives": "./src/archive-engine.mjs",
-    "./archive-format": "./src/archive-format.mjs"
+    "./archive-format": "./src/archive-format.mjs",
+    "./incremental": "./src/large-archive-store.mjs",
+    "./archive-router": "./src/archive-router.mjs"
   },
   "files": [
     "src/",
@@ -25,7 +27,7 @@
     "test": "node --test tests/*.test.mjs"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.13"
   },
   "repository": {
     "type": "git",
@@ -37,6 +39,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
     "ajv": "8.20.0",
+    "better-sqlite3-multiple-ciphers": "13.0.3",
     "parse5": "8.1.0"
   },
   "bin": {

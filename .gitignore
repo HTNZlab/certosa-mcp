@@ -22,3 +22,6 @@ archive-service.json
 archive-engine.json
 *.certosa.lock
 *.write-*
+
+# Incremental encrypted archives, WAL and incomplete copies
+*.certosa-db*

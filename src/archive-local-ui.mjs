@@ -41,6 +41,9 @@ export class LocalArchiveUI{
       INVALID_ARCHIVE:'Il file non e un archivio Certosa valido o non e integro. Non e stato modificato.',
       INVALID_ATTACHMENT:'Un allegato non supera il controllo di integrita. Il file non e stato modificato.',
       REVISION_CONFLICT:'Il file e cambiato durante l’apertura. Nessuna modifica e stata applicata. Riaprilo.'
+      ,DESTINATION_EXISTS:'Esiste gia un archivio con quel nome. Non e stato sostituito: scegli un nome nuovo.'
+      ,LEGACY_EXPORT_TOO_LARGE:'La biblioteca supera i limiti del formato .certosa attualmente supportato. L’archivio incrementale resta integro; nessun contenuto e stato scartato.'
+      ,INCREMENTAL_REQUIRED:'Questo comando richiede un archivio incrementale .certosa-db. Per un .certosa usa Esporta oppure crea prima una copia incrementale con Importa.'
     };
     return this.ask('notice',{message:messages[code]||'Apertura non completata. Il file non e stato modificato.'});
   }

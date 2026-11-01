@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.0.4-alpha.1 — 2026-11-01
+
+- Separate encrypted incremental `.certosa-db` backend with compressed pages,
+  encrypted FTS/history/WAL and deduplicated chunked original media.
+- Author only: read/search/reviewed edits; preserve all other existing metadata.
+- Explicit copy import, legacy-compatible export and consistent native backups.
+- Separate local executor; responsive status, fresh consent after failure.
+- Transaction/interrupted-import/recovery tests and a real 40,000-page/1-GiB
+  checksum benchmark; small page+author edits write 86,552 WAL bytes.
+- Legacy `.certosa` reader/writer retained, no automatic migration or provider submission.
+
+
 ## 0.0.3-alpha.2 — 2026-11-01
 
 - Launch the interactive native helper visibly and activate its taskbar window.

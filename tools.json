@@ -318,6 +318,41 @@
         "openWorldHint": false
       },
       "title": "Review a proposed change"
+    },
+    {
+      "name": "prepare_author_edit",
+      "title": "Prepare a notebook author change",
+      "description": "Prepare a reviewable author-only edit bound to the current revision. Never commits it. Other existing metadata are retained.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "notebookId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "baseRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "author": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "notebookId",
+          "baseRevision",
+          "author"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      }
     }
   ],
   "scope": "domain-only; local transport is implemented separately by runtime-tools.mjs and mcp-server.mjs"

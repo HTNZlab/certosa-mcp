@@ -87,7 +87,7 @@ export class ArchiveEngine{
     this.readState();
     if(name==='apply_proposal')return this.apply(args);
     if(name==='count_word')return this.count(args);
-    if(!['list_notebooks','read_notebook','search_notebooks','prepare_edit','read_proposal'].includes(name))fail('INVALID_TOOL_OR_ARGUMENTS');
+    if(!['list_notebooks','read_notebook','search_notebooks','prepare_edit','prepare_author_edit','read_proposal'].includes(name))fail('INVALID_TOOL_OR_ARGUMENTS');
     return this.session[name](args);
   }
   count({word,notebookId,caseSensitive=false}){
@@ -115,11 +115,15 @@ export class ArchiveEngine{
     if(proposal.operations.length!==1)fail('INVALID_EDIT');
     const op=proposal.operations[0],candidate=structuredClone(this.material.pack),nb=candidate.lib.notebooks.find(n=>n.id===op.notebookId);
     if(!nb||!this.allowed.has(nb.id)||secret(nb)||system(nb))fail('NOT_FOUND');
-    const page=nb.pages[op.pageNumber]||{html:'',st:[],notes:[]};
-    if(plainText(page.html||'')!==op.beforeText)fail('REVISION_CONFLICT');
-    page.html=op.mode==='append'?(page.html||'')+textHtml(op.afterText.slice(op.beforeText.length)):textHtml(op.afterText);
-    if(op.source)page.connectorSource=op.source;
-    nb.pages[op.pageNumber]=page;
+    if(op.type==='set_notebook_author'){
+      const before=String(typeof nb.author==='string'?nb.author:typeof candidate.lib.series.find(s=>s.id===nb.sid)?.author==='string'?candidate.lib.series.find(s=>s.id===nb.sid).author:'').slice(0,500);
+      if(before!==op.beforeAuthor)fail('REVISION_CONFLICT');nb.author=op.afterAuthor;
+    }else{
+      const page=nb.pages[op.pageNumber]||{html:'',st:[],notes:[]};
+      if(plainText(page.html||'')!==op.beforeText)fail('REVISION_CONFLICT');
+      page.html=op.mode==='append'?(page.html||'')+textHtml(op.afterText.slice(op.beforeText.length)):textHtml(op.afterText);
+      if(op.source)page.connectorSource=op.source;nb.pages[op.pageNumber]=page;
+    }
     this.applied.add(proposalId);this.busy=true;
     let temporary,checkpoint;
     try{

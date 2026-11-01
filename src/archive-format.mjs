@@ -10,6 +10,10 @@ export const archiveError=code=>Object.assign(Error(code),{code});
 const fail=code=>{throw archiveError(code);};
 export const isEncrypted=bytes=>bytes.length>=6&&Buffer.from(bytes).subarray(0,6).equals(MAGIC);
 export const hashBytes=bytes=>createHash('sha256').update(bytes).digest('hex');
+export async function createArchiveKey(password){
+  if(typeof password!=='string'||!password.length)fail('PASSWORD_REQUIRED');
+  const salt=randomBytes(16),iterations=600000,key=await pbkdf2(password,salt,iterations,32,'sha256');return {key,salt,iterations};
+}
 export function validateArchive(pack){
   const object=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
   const id=v=>typeof v==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(v);
