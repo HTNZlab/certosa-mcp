@@ -116,7 +116,7 @@ test('there is deliberately no apply, delete, restore or arbitrary HTTP/file too
 });
 test('tool descriptors expose domain tools and never the owner grant methods',()=>{
  const descriptor=JSON.parse(fs.readFileSync(new URL('../tools.json',import.meta.url),'utf8'));
- const f=fixture();assert.equal(descriptor.transportImplemented,false);
+ const f=fixture();
  assert.deepEqual(descriptor.tools.map(t=>t.name).sort(),Object.keys(f.session).filter(k=>k!=='close').sort());
  for(const tool of descriptor.tools){assert.equal(tool.inputSchema.additionalProperties,false);assert.equal(tool.annotations.openWorldHint,false);}
 });

@@ -5,3 +5,12 @@ node_modules/
 var/
 profiles/
 logs/
+
+# Local pairing and test profiles must never be committed
+certosa-mcp-lab/
+pairing.json
+browser-launch.json
+ready.json
+seed.html
+lab.json
+cache-node/

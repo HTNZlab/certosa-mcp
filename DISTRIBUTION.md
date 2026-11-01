@@ -7,23 +7,27 @@ con il quaderno «Usi Interessanti», orientato a bisogni umani.
 
 ## Stato reale
 
-Il ramo contiene ancora un motore di dominio e proposte, non un server MCP
-installabile. Il primo export pubblico è una preview del codice, inclusa la
-capacità sperimentale di usare credenziali tramite esecutore locale simulato.
-Non contiene un deposito credenziali o un esecutore reale. Gli invii ai cataloghi
+La versione 0.0.2-alpha.1 è un server MCP stdio funzionante per la sola biblioteca
+di prova: lettura, ricerca e modifiche cifrate persistenti tramite ponte locale.
+La credenziale fittizia viene generata nel browser e verificata da un servizio
+HTTP loopback, senza il valore nei messaggi MCP. Non integra servizi esterni o
+credenziali personali. Vedere [LIVE-LAB.md](LIVE-LAB.md). Gli invii ai cataloghi
 **non sono stati eseguiti**. L'approvazione di un catalogo non deriva dalla
 pubblicazione su GitHub. La scelta «quaderni solo sul dispositivo» resta valida.
 
 ## Repository e distribuzione indipendente
 
-Repository previsto per la preview: `HTNZlab/certosa-mcp`, con storia nuova e manifest
+Repository pubblico: [HTNZlab/certosa-mcp](https://github.com/HTNZlab/certosa-mcp),
+laboratorio [v0.0.2-alpha.1](https://github.com/HTNZlab/certosa-mcp/releases/tag/v0.0.2-alpha.1).
+Pubblicati con storia nuova e manifest
 di esportazione esplicito. Licenza MIT del codice, notices delle dipendenze,
 README inglese e italiano, installazione, esempi, supporto, changelog, test e CI.
 Release versionate con checksum e istruzioni per aggiornare e rimuovere il
 connettore. Dichiarare chiaramente ambienti supportati e limitazioni mobile.
 
-Prima release utilizzabile come connettore: implementare trasporto MCP con SDK mantenuto, connessione
-autorizzata alla Certosa sbloccata, consenso ai quaderni e commit/ripristino.
+Per una release generale: estendere il trasporto locale già funzionante con una
+connessione autorizzata agli archivi personali, consenso/classificazione sensibili
+completi e commit/ripristino delle collezioni.
 Testare un'installazione pulita su ogni piattaforma dichiarata. Non presentare
 il catalogo JSON attuale come se fosse già un server MCP.
 

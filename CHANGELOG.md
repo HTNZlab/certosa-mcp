@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.0.2-alpha.1 — 2026-11-01
+
+- Working local stdio MCP transport through the official SDK, eight validated tools.
+- Loopback browser bridge limited to a synthetic library and explicit owner consent.
+- Native encrypted page commits, revision conflicts, checkpoints and local undo.
+- Fictional credential stored encrypted and used against a fixed local HTTP fixture;
+  the model receives only a handle and fixed status, never the value.
+- Separate-profile lab setup and local client instructions. No provider web gateway,
+  personal archive support, external login, catalog submission or approval.
+
 ## 0.0.1-alpha.1 — 2026-11-01
 
 - Initial public capability-core preview; no MCP transport or real connector.

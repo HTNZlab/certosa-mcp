@@ -1,90 +1,86 @@
-# Certosa MCP — pre-alpha
+# Certosa MCP — local test-library connector
 
-Open-source work toward an MCP adapter for Certosa, the local personal notebook
-library. It aims to help people find their notes, resume a task, save a chosen
-thought from a chat, and use a local credential without disclosing it to an AI.
+Version 0.0.2-alpha.1 implements a working **local stdio MCP server** backed by
+Certosa's real encrypted browser archive in an isolated test profile. It can
+search/read the authorised notebook, preview and persist page edits, and use a
+fictional credential against a loopback authentication fixture without returning
+its value to the model. It is not connected to any provider account or directory.
 
-**Current release: a tested local capability core, not a runnable MCP server.**
-There is no stdio/HTTP transport, remote gateway, OAuth flow, Certosa consent UI,
-or persistent write implementation yet. It cannot currently be installed as a
-working connector in ChatGPT, Claude or Grok. No directory approval is claimed.
+## Run the local lab
 
-## What is included
-
-- List/read/search only the personal notebooks selected by the local owner.
-- Bounded plain-text results with notebook/page/revision references.
-- Expiring grants, revocation on archive lock or replacement, revision checks.
-- Preview new collections and edits. Proposals stay in memory and do not write.
-- Typed tool descriptors and 27 unit checks, including Certosa's search engine.
-- A separate one-use credential capability, tested with a mock executor only.
-
-The owner injects an unlocked snapshot, plain-text conversion and local search.
-This module has no network, filesystem or database access. It excludes the
-system manual and notebooks explicitly marked `sensitivity: "secret"`.
-The title "Passwords" alone is not a classification; the app classification UI
-is not implemented yet. This is not an isolation boundary against malicious code already
-running in the same origin; the future bridge must enforce authentication.
-
-## Try the capability core
-
-Use Node.js 22 or newer. There are no runtime dependencies.
+Requires Node.js 22+, a trusted local Certosa PWA folder with `app.html` and its
+assets, and an isolated browser profile. Certosa itself is not bundled. Keep all
+runtime files, browser profiles, temporary files and caches in your own project.
 
 ```sh
 git clone https://github.com/HTNZlab/certosa-mcp.git
 cd certosa-mcp
+npm ci --ignore-scripts
 npm test
+node src/lab-setup.mjs --project /absolute/project --site /absolute/project/certosa-pwa --out /absolute/project/test-lab --browser /absolute/path/chrome
 ```
 
-The prerelease package can be installed as a JavaScript library. Its export is
-`createLocalNotebookTools`; supplying an owner adapter is required. There is no
-server executable or automatic connection to a browser profile.
+The lab generates a minimal synthetic `Usi Interessanti` notebook. The optional
+`--library` argument accepts the matching native single-notebook test archive.
+An existing output/profile is preserved. See [full lab instructions](LIVE-LAB.md)
+for restarting it and for local MCP client configurations.
 
-## Use a credential without disclosing it
+In Certosa choose your own local archive password, then Menu → Collega alla chat
+· prova → Collega per 15 minuti. Configure a local stdio-capable client to launch
+`node src/mcp-server.mjs /absolute/project/test-lab/pairing.json`. Do not copy the
+pairing token or archive password into tool arguments or a chat. An already-open
+chat may need to reload its MCP configuration; verify its tool inventory.
 
-`createLocalSecretCapabilities` is exported by `certosa-mcp/secrets`. The trusted
-owner binds a credential ID, HTTPS origin, authentication action, duration and
-use limit. The AI receives a short-lived opaque handle. It cannot substitute a
-URL, request a raw secret, or receive cookies, tokens or free-form debug output.
-The local executor should retrieve and use the credential; the public result
-contains only a fixed status. Revocation during an action may leave its external
-outcome indeterminate; it does not guarantee rollback.
+## What works
 
-**No real credential vault, local action executor or browser login is included.**
-The tests use fictional credentials and mocked actions. A real executor must
-validate the actual destination and redirects, honor revocation, and prevent
-secrets from entering logs, screenshots and model-facing messages. A value
-merely hidden in the chat UI would not meet this design.
+- Eight schema-validated MCP tools using the official SDK and stdio transport.
+- Scoped list/read/search, with native search and notebook/page/revision references.
+- Prepare/review/apply page edits through native encryption and atomic revision checks.
+- Append preserves existing formatting; replace writes plain-text paragraphs.
+- Notes/attachment metadata are preserved; a pre-write encrypted checkpoint is kept.
+- Local undo of the last edit, provided no later write changed the revision.
+- Owner consent, expiry, revocation on archive lock/replacement, stale-edit rejection.
+- One-use fictional authentication, returning only an opaque handle and fixed status.
 
-Notebook reading and secret use are separate capabilities. Sensitive notebooks
-must be classified and excluded from generic read/search tools before any real
-vault integration is enabled. The core is not a security boundary against
-malicious code running in its trusted local process.
+27 domain unit tests pass. A separate full-app integration run checks real SDK
+client/server communication, browser persistence after reload, undo, conflicts,
+failed saves, consent/revocation and a generated credential excluded from the
+MCP transcript. These are synthetic headless tests, not physical-phone or
+ChatGPT/Claude/Grok account qualification.
 
-## Roadmap
+Collection proposals remain available in the core library but are not exposed
+by this server until their persistence/rendering path is completed. There are
+no delete, raw secret read, arbitrary URL, shell or filesystem tools.
 
-1. Test a few human workflows with an independent sample notebook.
-2. Add owner consent, durable writes, conflict handling, backup and undo.
-3. Implement MCP transport with an official maintained SDK and a device bridge.
-4. Test clean installs in each supported client and package the integrations.
-5. Submit through the OpenAI and Claude publishing processes when eligible.
+## Credential boundary
 
-See [distribution and submission](DISTRIBUTION.md). GitHub availability and
-provider directory acceptance are separate milestones. Local MCP submission
-through OpenAI currently requires partner approval; Claude documents a plugin
-route for local servers. Do not use older desktop-extension listings as the
-current directory submission procedure.
+The browser generates a fictional random value and saves it in a notebook marked
+`sensitivity: "secret"` within the encrypted archive. This notebook is excluded
+from generic tools. A fixed lab-only executor maps the logical HTTPS fixture
+origin to the loopback HTTP test service; this does not qualify external TLS,
+redirects or a real website login. No real credential integration is shipped.
+The service keeps only a digest in RAM and never logs request bodies. Raw
+passwords, cookies, tokens and debug messages are not returned to the model.
 
-## Privacy
+Local code with the same user/origin privileges is trusted. The capability core
+is not an isolation boundary against malicious code already running there.
+Revoking an action after dispatch does not guarantee rollback: its outcome may
+be indeterminate. Never automatically retry an uncertain write or authentication.
 
-The core has no telemetry and does not persist or transmit notebook contents.
-Callers receive the text returned by their granted tools. A remote LLM or
-future gateway will see any excerpts sent to it; keeping the archive on the
-device does not keep remote processing on the device. Never give the archive
-password to a model. Do not post notebooks, passwords or keys in GitHub issues.
+## Privacy and scope
 
-Sample libraries, personal profiles, private repository history and working logs
-are excluded from this repository and its package. This project is not an
-official OpenAI, Anthropic or xAI product.
+Only the synthetic library is supported in this alpha. The public Certosa PWA
+is unchanged. No personal profile, archive, private Git history or working log
+is included in the source or package. There is no content database in the bridge,
+telemetry or cloud relay. The browser stores the archive on the device; local
+pairing files are created in the operator-selected project. A remote model will
+see the notebook excerpts that its authorised tools return. There is no provider
+OAuth flow or ChatGPT/Claude/Grok web connector yet. Mobile background suspension
+can make the device temporarily unavailable.
 
-Code: MIT, copyright 2026 Daniele Nencini per HTNZLab. The search test-support
-file comes from the same MIT-licensed Certosa project.
+See [distribution and provider submission](DISTRIBUTION.md). No submission or
+approval is claimed. This is not an official OpenAI, Anthropic or xAI product.
+Do not post personal notebooks or credentials in issues.
+
+Code: MIT, copyright 2026 Daniele Nencini per HTNZLab. Search test support is from
+the same MIT-licensed Certosa project. [Italiano](README.it.md).

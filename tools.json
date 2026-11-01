@@ -1,6 +1,5 @@
 {
   "prototype": true,
-  "transportImplemented": false,
   "tools": [
     {
       "name": "list_notebooks",
@@ -320,5 +319,6 @@
       },
       "title": "Review a proposed change"
     }
-  ]
+  ],
+  "scope": "domain-only; local transport is implemented separately by runtime-tools.mjs and mcp-server.mjs"
 }

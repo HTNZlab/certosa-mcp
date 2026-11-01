@@ -1,24 +1,23 @@
-# Certosa MCP — prototipo pubblico
+# Certosa MCP — laboratorio locale funzionante
 
-Questo repository prepara un connettore per la biblioteca locale Certosa.
-La prima versione pubblica contiene il motore di lettura/ricerca e le anteprime
-non applicate delle modifiche. Non è ancora un server MCP installabile nei
-client: mancano trasporto, collegamento al dispositivo, consenso e commit reale.
+La versione 0.0.2-alpha.1 aggiunge il trasporto MCP stdio alla biblioteca di prova
+Certosa: ricerca, lettura e modifiche salvate realmente nell'archivio cifrato.
+Note e formattazione precedente sono conservate in append; il pannello locale
+permette di annullare l'ultima modifica se la revisione è ancora valida.
 
-I quaderni restano sul dispositivo. Password, archivi, profili browser e cronologia
-privata non sono distribuiti. Il contenuto scelto per un LLM remoto sarà comunque
-visto da quel servizio. Nessuna accettazione nei cataloghi è stata ottenuta.
+Una credenziale fittizia generata nel browser autentica una richiesta HTTP
+loopback. Il suo valore non appare nella chat o nei messaggi MCP: torna solo
+l'esito. È una prova locale, non un'integrazione con account o password reali.
 
-Il prototipo include anche un riferimento opaco monouso per chiedere un'autenticazione locale: il modello riceve solo l'esito, non il segreto.
-Deposito credenziali ed esecutore reali non sono implementati; le azioni sono
-simulate nei test. Il semplice titolo Passwords non protegge un quaderno: serve
-classificarlo ed escluderlo dalla lettura/ricerca generica.
+[Avvio e configurazione](LIVE-LAB.md) · [Guida completa](README.md) ·
+[Distribuzione e submission](DISTRIBUTION.md).
 
-Le 27 prove unitarie si avviano con `npm test` da un clone, usando Node.js 22+.
-Il pacchetto prerelease è una libreria JavaScript senza dipendenze runtime;
-non contiene un comando server o un collegamento automatico a Certosa.
+Servono Node.js22+ e una copia attendibile della PWA Certosa con i suoi asset,
+non inclusa nel pacchetto. `npm ci --ignore-scripts` installa le dipendenze;
+`npm test` esegue27 unitari. Il collaudo separato nella vera app usa un archivio
+sintetico cifrato e un client SDK MCP reale. Non qualifica telefono fisico o
+installazione nei tre account. Le chat web richiedono ancora un ponte remoto.
 
-[Stato e utilizzo](README.md) · [Distribuzione e submission](DISTRIBUTION.md)
-
-Il quaderno locale «Usi Interessanti» guiderà la scelta dei flussi, partendo da
-bisogni umani e da riscontri di utilizzo, non da un elenco di automazioni.
+Sono accettati solo la biblioteca sintetica e un profilo separato; i quaderni
+personali e la PWA pubblica restano fuori da questa prova. Nessuna submission
+inviata e nessuna approvazione dei fornitori ottenuta.
