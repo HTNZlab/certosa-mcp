@@ -1,6 +1,6 @@
 # Certosa MCP — laboratorio locale funzionante
 
-La versione 0.0.2-alpha.1 aggiunge il trasporto MCP stdio alla biblioteca di prova
+La versione 0.0.2-alpha.2 aggiunge il trasporto MCP stdio alla biblioteca di prova
 Certosa: ricerca, lettura e modifiche salvate realmente nell'archivio cifrato.
 Note e formattazione precedente sono conservate in append; il pannello locale
 permette di annullare l'ultima modifica se la revisione è ancora valida.

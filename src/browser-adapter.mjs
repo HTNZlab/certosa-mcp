@@ -2,8 +2,9 @@ import {createLocalNotebookTools} from './notebook-tools.mjs';
 import {createLocalSecretCapabilities} from './secret-capabilities.mjs';
 // This module is loaded only by the dedicated loopback lab, never by the public PWA.
 const fragment=new URLSearchParams(location.hash.slice(1));
-const pairing=fragment.get('certosa-pair')||sessionStorage.getItem('certosa-lab-pair');
-if(pairing){sessionStorage.setItem('certosa-lab-pair',pairing);history.replaceState(null,'',location.pathname);}
+let pairing=fragment.get('certosa-pair');
+try{pairing||=sessionStorage.getItem('certosa-lab-pair');if(pairing)sessionStorage.setItem('certosa-lab-pair',pairing);}catch{}
+if(pairing)history.replaceState(null,'',location.pathname);
 let config,lease,session,secretSession,closed=true,writing=false,archiveReference;
 let connectedUntil=0,generation=0;
 let lastEdit=null;
@@ -45,7 +46,7 @@ async function apply({proposalId}){
   if(operation.mode==='append')pg.html=(pg.html||'')+htmlText(operation.afterText.slice(operation.beforeText.length));
   else pg.html=htmlText(operation.afterText);
   if(operation.source)pg.connectorSource=operation.source;
-  const oldBook=Book.nb?.id,oldPage=Book.activePage;
+  const oldBook=document.getElementById('desk').classList.contains('active')?Book.nb?.id:null,oldPage=Book.activePage;
   const beforePage=structuredClone(lib.notebooks.find(n=>n.id===nb.id).pages[operation.pageNumber]||null);
   consumed.add(proposalId);blockEditing(true);
   try{
@@ -54,6 +55,7 @@ async function apply({proposalId}){
     if(!await Store.save(candidate))error('SAVE_FAILED');
     // Store.save uses the existing AES-GCM envelope and atomic revision check.
     lib.notebooks=candidate.notebooks;
+    if(Book.nb)Book.nb=lib.notebooks.find(n=>n.id===Book.nb.id)||null;
   }catch(e){throw Object.assign(Error('SAVE_FAILED'),{code:e.code||'SAVE_FAILED'});}
   finally{blockEditing(false);}
   Object.values(Layout.cache).forEach(p=>p.remove());Layout.cache={};
@@ -72,11 +74,11 @@ async function undoLocal(){
   const candidate=structuredClone(lib),nb=candidate.notebooks.find(n=>n.id===lastEdit.notebookId);
   if(!nb||nb.sensitivity==='secret')error('FORBIDDEN');
   nb.pages[lastEdit.pageNumber]=structuredClone(lastEdit.beforePage);
-  const oldBook=Book.nb?.id,oldPage=Book.activePage;
+  const oldBook=document.getElementById('desk').classList.contains('active')?Book.nb?.id:null,oldPage=Book.activePage;
   blockEditing(true);
   try{
     if(!await Store.istantanea('mcp-undo-'+Date.now())||!await Store.save(candidate))error('SAVE_FAILED');
-    lib.notebooks=candidate.notebooks;lastEdit=null;
+    lib.notebooks=candidate.notebooks;if(Book.nb)Book.nb=lib.notebooks.find(n=>n.id===Book.nb.id)||null;lastEdit=null;
   }finally{blockEditing(false);}
   Object.values(Layout.cache).forEach(p=>p.remove());Layout.cache={};slotL.replaceChildren();slotR.replaceChildren();Room.fill();
   if(oldBook){const current=lib.notebooks.find(n=>n.id===oldBook);if(current){Book.open(current);Book.goToPage(oldPage,null,true);}}
@@ -165,10 +167,24 @@ dialog.querySelector('#certosaUndo').onclick=safeAction(undoLocal);
 dialog.querySelector('#certosaFixture').onclick=safeAction(async()=>{if(closed)error('SESSION_CLOSED');await makeFictionalCredential();dialog.close();});
 dialog.querySelector('#certosaDialogClose').onclick=()=>dialog.close();
 document.body.append(dialog);
-if(pairing){
-  config=await request('/bridge/config');
-  for(const menu of document.querySelectorAll('#menuRoom,#menuDesk')){
-    const button=document.createElement('button');button.textContent='Collega alla chat · prova…';button.dataset.certosaConnector='open';
-    button.onclick=event=>{event.stopPropagation();menu.classList.remove('on');dialog.showModal();};menu.append(button);
-  }
+function openPanel(event){
+  event?.stopPropagation();
+  if(typeof Menu!=='undefined')Menu.closeAll();
+  if(!dialog.open)dialog.showModal();
 }
+// Discovery must not depend on successful pairing. A missing/expired pairing
+// needs a visible explanation rather than a silently absent menu entry.
+for(const [menuId,triggerId] of [['menuRoom','btnMenuRoom'],['menuDesk','btnMenuDesk']]){
+  const menu=document.getElementById(menuId),trigger=document.getElementById(triggerId);
+  if(menu){const button=document.createElement('button');button.textContent='Collega alla chat · prova…';button.dataset.certosaConnector='open';button.onclick=openPanel;menu.prepend(button);}
+  if(trigger){const button=document.createElement('button');button.type='button';button.className='btn quiet';button.textContent='Chat';button.title='Collega la biblioteca di prova alla chat';button.setAttribute('aria-label',button.title);button.dataset.certosaConnector='shortcut';button.style.minHeight='36px';button.onclick=openPanel;trigger.before(button);}
+}
+dialog.querySelector('#certosaConnect').disabled=true;
+dialog.querySelector('#certosaFixture').disabled=true;
+if(pairing){
+  try{
+    config=await request('/bridge/config');
+    dialog.querySelector('#certosaConnect').disabled=false;
+    dialog.querySelector('#certosaFixture').disabled=false;
+  }catch{status.textContent='Abbinamento locale non valido o servizio non disponibile. Riapri Apri-Certosa-con-chat.cmd nella cartella della prova.';}
+}else status.textContent='Questa finestra non è abbinata alla chat. Riapri Apri-Certosa-con-chat.cmd nella cartella della prova: i tuoi quaderni saranno conservati.';

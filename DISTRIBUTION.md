@@ -7,7 +7,7 @@ con il quaderno «Usi Interessanti», orientato a bisogni umani.
 
 ## Stato reale
 
-La versione 0.0.2-alpha.1 è un server MCP stdio funzionante per la sola biblioteca
+La versione 0.0.2-alpha.2 è un server MCP stdio funzionante per la sola biblioteca
 di prova: lettura, ricerca e modifiche cifrate persistenti tramite ponte locale.
 La credenziale fittizia viene generata nel browser e verificata da un servizio
 HTTP loopback, senza il valore nei messaggi MCP. Non integra servizi esterni o
@@ -18,7 +18,7 @@ pubblicazione su GitHub. La scelta «quaderni solo sul dispositivo» resta valid
 ## Repository e distribuzione indipendente
 
 Repository pubblico: [HTNZlab/certosa-mcp](https://github.com/HTNZlab/certosa-mcp),
-laboratorio [v0.0.2-alpha.1](https://github.com/HTNZlab/certosa-mcp/releases/tag/v0.0.2-alpha.1).
+laboratorio [v0.0.2-alpha.2](https://github.com/HTNZlab/certosa-mcp/releases/tag/v0.0.2-alpha.2).
 Pubblicati con storia nuova e manifest
 di esportazione esplicito. Licenza MIT del codice, notices delle dipendenze,
 README inglese e italiano, installazione, esempi, supporto, changelog, test e CI.

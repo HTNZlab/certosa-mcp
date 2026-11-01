@@ -60,6 +60,6 @@ if(args.has('--browser')){
  const browser=fs.realpathSync(args.get('--browser'));
  const {url}=JSON.parse(fs.readFileSync(path.join(out,'browser-launch.json'),'utf8'));
  spawn(browser,['--user-data-dir='+path.join(out,'profilo-browser'),'--disk-cache-dir='+path.join(out,'cache-browser'),
-  '--crash-dumps-dir='+path.join(out,'.tmp'),'--no-first-run','--no-default-browser-check','--disable-background-networking','--disable-sync','--disable-component-update','--disable-breakpad','--app='+url],{stdio:'ignore',windowsHide:true});
+  '--crash-dumps-dir='+path.join(out,'.tmp'),'--no-first-run','--no-default-browser-check','--disable-background-networking','--disable-sync','--disable-component-update','--disable-breakpad','--new-window','--window-position=60,60','--window-size=1180,820',url],{stdio:'ignore',windowsHide:false});
 }
 process.stdout.write('Local test lab ready. Use pairing.json only from a local MCP client. The browser launch URL is stored locally, never a model argument.\n');

@@ -1,6 +1,6 @@
 # Biblioteca di prova collegata alla chat
 
-Versione 0.0.2-alpha.1, 1 novembre 2026. Laboratorio locale funzionante, distinto
+Versione 0.0.2-alpha.2, 1 novembre 2026. Laboratorio locale funzionante, distinto
 dalla PWA pubblica e dalle integrazioni negli account ChatGPT, Claude e Grok.
 
 ## Aprire la prova preparata sul computer dell'owner
@@ -8,8 +8,13 @@ dalla PWA pubblica e dalle integrazioni negli account ChatGPT, Claude e Grok.
 Aprire `H:/certosa/verifiche/connector-live-20261101/Apri-Certosa-con-chat.cmd`.
 Usa un profilo browser dedicato sul progetto H, diverso sia da Chrome personale
 sia dalle revisioni della biblioteca già consegnate. Al primo ingresso scegliere
-la propria password locale. Poi Menu → Collega alla chat · prova → Collega per
+la propria password locale. Poi premere **Chat**, accanto a Menu (in alto nel quaderno, in basso a destra
+nella stanza), e scegliere Collega per
 15 minuti. Viene autorizzato soltanto il quaderno «Usi Interessanti».
+
+Se manca l’abbinamento, il pulsante Chat resta presente e spiega come riaprire
+la prova. La voce del menu è ora la prima, sempre presente. Per aggiornare una
+finestra già aperta salvare con Ctrl+S e ricaricare con Ctrl+R.
 
 La chat locale deve configurare il server stdio con `mcp-server.mjs` e il percorso
 di `pairing.json`. Nella cartella della prova sono preparati esempi Codex TOML e

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.0.2-alpha.2 — 2026-11-01
+
+- Always show a compact Chat button beside Menu in the room and notebook.
+- Put the connector first in both menus; explain missing/invalid pairing.
+- Tolerate unavailable sessionStorage and open a normal visible lab window.
+- Preserve archives, owner consent, tool scopes and credential boundaries.
+
 ## 0.0.2-alpha.1 — 2026-11-01
 
 - Working local stdio MCP transport through the official SDK, eight validated tools.

@@ -13,7 +13,7 @@ const config=JSON.parse(fs.readFileSync(filename,'utf8'));
 const origin=new URL(config.origin);
 if(origin.protocol!=='http:'||origin.hostname!=='127.0.0.1'||origin.pathname!=='/'||origin.search||origin.hash)throw Error('INVALID_LOCAL_BRIDGE');
 const ajv=new Ajv(),validators=new Map(tools.map(t=>[t.name,ajv.compile(t.inputSchema)]));
-const server=new Server({name:'certosa-local',version:'0.0.2-alpha.1'},{capabilities:{tools:{}}});
+const server=new Server({name:'certosa-local',version:'0.0.2-alpha.2'},{capabilities:{tools:{}}});
 const failure=code=>({isError:true,content:[{type:'text',text:JSON.stringify({error:code})}]});
 server.setRequestHandler(ListToolsRequestSchema,async()=>({tools}));
 server.setRequestHandler(CallToolRequestSchema,async request=>{
