@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.0.3-alpha.2 — 2026-11-01
+
+- Launch the interactive native helper visibly and activate its taskbar window.
+- Owner Windows file/password/consent flow verified on an authored sample, followed by real file reading/search/count/write and complete readback.
+- Keep archive format, tool scopes and size limits unchanged.
+
+
 ## 0.0.3-alpha.1 — 2026-11-01
 
 - Standalone file-based CRTS2 archive engine; no Certosa/browser needed.

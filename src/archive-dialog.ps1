@@ -11,6 +11,8 @@ try {
   $form=New-Object System.Windows.Forms.Form
   $form.Text='Certosa · Archivio locale'
   $form.Width=580;$form.Height=440;$form.StartPosition='CenterScreen';$form.TopMost=$true
+  $form.ShowInTaskbar=$true
+  $form.Add_Shown({$form.Activate();$form.BringToFront()})
   $form.Font=[System.Drawing.Font]::new('Segoe UI',10)
   if($Mode -eq 'notice'){
     [void][System.Windows.Forms.MessageBox]::Show($form,[string]$data.message,'Certosa · Archivio locale',[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Information)

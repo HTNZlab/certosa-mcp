@@ -7,7 +7,7 @@ con il quaderno «Usi Interessanti», orientato a bisogni umani.
 
 ## Stato reale
 
-La versione0.0.3-alpha.1 aggiunge un motore autonomo per i file .certosa e un
+La versione0.0.3-alpha.2 aggiunge un motore autonomo per i file .certosa e un
 server MCP stdio. Scelta file, password e consenso sono locali su Windows;
 lettura/ricerca/conteggio/scrittura non richiedono l’app né il browser.
 Il formato corrente è mantenuto, con limiti sperimentali: non qualificato per
@@ -17,7 +17,7 @@ Nessun accesso a provider, ponte remoto o submission è stato eseguito.
 ## Repository e distribuzione indipendente
 
 Repository pubblico: [HTNZlab/certosa-mcp](https://github.com/HTNZlab/certosa-mcp),
-motore [v0.0.3-alpha.1](https://github.com/HTNZlab/certosa-mcp/releases/tag/v0.0.3-alpha.1).
+motore [v0.0.3-alpha.2](https://github.com/HTNZlab/certosa-mcp/releases/tag/v0.0.3-alpha.2).
 Pubblicati con storia nuova e manifest
 di esportazione esplicito. Licenza MIT del codice, notices delle dipendenze,
 README inglese e italiano, installazione, esempi, supporto, changelog, test e CI.

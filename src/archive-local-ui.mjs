@@ -17,7 +17,7 @@ export class LocalArchiveUI{
       const script=fs.readFileSync(fileURLToPath(new URL('./archive-dialog.ps1',import.meta.url)),'utf8');
       const child=spawn(executable,['-NoLogo','-NoProfile','-STA','-Command','& {\n'+script+'\n} -Mode '+mode],{
         cwd:this.runtime,env:{...process.env,TEMP:path.join(this.runtime,'.tmp'),TMP:path.join(this.runtime,'.tmp'),TMPDIR:path.join(this.runtime,'.tmp')},
-        stdio:['pipe','pipe','pipe'],windowsHide:true
+        stdio:['pipe','pipe','pipe'],windowsHide:false
       });
       this.child=child;let output=[],length=0,settled=false;
       const finish=(error,value)=>{if(settled)return;settled=true;this.child=null;for(const chunk of output)chunk.fill(0);output=[];error?reject(error):resolve(value);};

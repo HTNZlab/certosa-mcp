@@ -9,7 +9,7 @@ import {fixedErrors} from './archive-service.mjs';
 
 const filename=process.argv[2];if(!filename)throw Error('LOCAL_ARCHIVE_CONFIG_REQUIRED');
 const validators=new Map(archiveTools.map(t=>[t.name,new Ajv().compile(t.inputSchema)]));
-const server=new Server({name:'certosa-archives',version:'0.0.3-alpha.1'},{capabilities:{tools:{}}});
+const server=new Server({name:'certosa-archives',version:'0.0.3-alpha.2'},{capabilities:{tools:{}}});
 const result=value=>({isError:!!value.error,content:[{type:'text',text:JSON.stringify(value)}]});
 server.setRequestHandler(ListToolsRequestSchema,async()=>({tools:archiveTools}));
 server.setRequestHandler(CallToolRequestSchema,async request=>{

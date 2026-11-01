@@ -1,4 +1,4 @@
-# Motore autonomo degli archivi Certosa — 0.0.3-alpha.1
+# Motore autonomo degli archivi Certosa — 0.0.3-alpha.2
 
 Il percorso principale apre direttamente un file `.certosa`, senza Certosa,
 Chrome, IndexedDB, PWA o profilo browser. Il file resta nel formato corrente
@@ -96,6 +96,7 @@ l’API e il lettore del formato attuale. Nessun nuovo formato scritto ora.
 23test del motore più27unitari di dominio,23controlli SDK/MCP reali sul file e
 5controlli di avvio/riavvio servizio. I test usano archivi cifrati sintetici,
 con decifratura finale tramite le funzioni ORIGINALI dell’app; nessun browser
-usato nel flusso del motore. La finestra/password owner richiede prova locale,
-separata dai provider UI sostitutivi dei test. Non sono collaudati account
+usato nel flusso del motore. Il percorso nativo owner di scelta/password/consenso è stato eseguito su un
+archivio di esempio, seguito da lettura, ricerca, conteggio e scrittura dalla
+chat con rilettura integrale. Resta distinto dai provider UI sostitutivi dei test. Non sono collaudati account
 ChatGPT/Claude/Grok, telefono fisico o ponte MCP remoto; nessuna submission.

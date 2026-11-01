@@ -1,6 +1,6 @@
 {
   "name": "certosa-mcp",
-  "version": "0.0.3-alpha.1",
+  "version": "0.0.3-alpha.2",
   "description": "Local MCP archive engine for .certosa files: native local unlock, scoped reading/search/counting and encrypted writes without the Certosa app.",
   "type": "module",
   "license": "MIT",

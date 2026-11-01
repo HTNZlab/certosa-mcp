@@ -1,6 +1,6 @@
 # Certosa MCP — standalone local archive engine
 
-Version **0.0.3-alpha.1** opens and edits `.certosa` files directly, without the
+Version **0.0.3-alpha.2** opens and edits `.certosa` files directly, without the
 Certosa application, browser, PWA or IndexedDB. Archives stay on the device.
 The existing CRTS2 format is retained: PBKDF2-SHA256, gzip before AES-256-GCM,
 and an authenticated header. No new storage format or archive migration.
@@ -96,7 +96,8 @@ previews are separate. No storage migration is performed in this release.
 cover original-format interoperation, password/tamper rejection, local consent,
 scopes, exact counting, encrypted writes/recovery, field/media preservation,
 conflicts, failed replacement, lock/expiry, junction confinement and reconnects.
-All archives/credentials are synthetic. The owner native-window interaction is
+All archives/credentials are synthetic. An owner run also completed native Windows file/password/consent and chat
+read/search/count/write with full readback on the authored sample. This remains
 separate from injected UI providers in automated tests. No physical-phone, GB-scale,
 provider-account, remote-web gateway or directory submission is claimed.
 
