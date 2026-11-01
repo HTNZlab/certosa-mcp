@@ -1,12 +1,14 @@
 {
   "name": "certosa-mcp",
-  "version": "0.0.2-alpha.3",
-  "description": "Local stdio MCP connector for the isolated Certosa test library, with encrypted writes and a non-disclosing fictional credential demo.",
+  "version": "0.0.3-alpha.1",
+  "description": "Local MCP archive engine for .certosa files: native local unlock, scoped reading/search/counting and encrypted writes without the Certosa app.",
   "type": "module",
   "license": "MIT",
   "exports": {
     ".": "./src/notebook-tools.mjs",
-    "./secrets": "./src/secret-capabilities.mjs"
+    "./secrets": "./src/secret-capabilities.mjs",
+    "./archives": "./src/archive-engine.mjs",
+    "./archive-format": "./src/archive-format.mjs"
   },
   "files": [
     "src/",
@@ -34,10 +36,13 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
-    "ajv": "8.20.0"
+    "ajv": "8.20.0",
+    "parse5": "8.1.0"
   },
   "bin": {
-    "certosa-mcp": "src/mcp-server.mjs",
-    "certosa-mcp-lab": "src/lab-setup.mjs"
+    "certosa-mcp": "src/archive-mcp-server.mjs",
+    "certosa-mcp-lab": "src/lab-setup.mjs",
+    "certosa-archive-setup": "src/archive-setup.mjs",
+    "certosa-browser-lab": "src/mcp-server.mjs"
   }
 }

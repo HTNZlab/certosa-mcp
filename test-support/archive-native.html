@@ -1,0 +1,110 @@
+<script>
+const Zip = {
+  can: typeof CompressionStream!=='undefined',
+  async deflate(u8){
+    if(!this.can) return u8;
+    const cs=new CompressionStream('gzip');
+    const s=new Blob([u8]).stream().pipeThrough(cs);
+    return new Uint8Array(await new Response(s).arrayBuffer());
+  },
+  async inflate(u8,limit=512*1024*1024){
+    if(u8.byteLength>limit)throw new Error(T('formato non riconosciuto'));
+    if(u8[0]!==0x1f || u8[1]!==0x8b) return u8;                 // non compresso
+    const ds=new DecompressionStream('gzip');
+    const s=new Blob([u8]).stream().pipeThrough(ds);
+    const reader=s.getReader(),chunks=[];let size=0;
+    try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>limit){await reader.cancel();throw new Error(T('formato non riconosciuto'));}chunks.push(value);}}finally{reader.releaseLock();}
+    const out=new Uint8Array(size);let offset=0;for(const chunk of chunks){out.set(chunk,offset);offset+=chunk.length;}return out;
+  },
+  async packJSON(obj){ return this.deflate(new TextEncoder().encode(JSON.stringify(obj))); },
+  async unpackJSON(u8){ return JSON.parse(new TextDecoder().decode(await this.inflate(u8))); }
+};
+
+
+
+/* ===================== cifratura dell'archivio =====================
+   chiave derivata dalla passphrase con PBKDF2-SHA256 (600.000 giri),
+   dati cifrati con AES-256-GCM: nonce nuovo a ogni scrittura, mai riusato.
+   La chiave vive solo in memoria: senza passphrase l'archivio è illeggibile,
+   anche per noi. AES-256 resta adeguato anche contro i computer quantistici
+   (Grover dimezza i bit: 128 effettivi, fuori portata).                     */
+const GIRI_PBKDF2 = 600000;
+
+const Cripto = {
+  chiave:null, salt:null, attiva:false,
+  disponibile(){ return !!(window.crypto && crypto.subtle && crypto.subtle.deriveKey); },
+  rnd(n){ const u=new Uint8Array(n); crypto.getRandomValues(u); return u; },
+  b64(u8){ let s=''; const C=0x8000; for(let i=0;i<u8.length;i+=C) s+=String.fromCharCode.apply(null,u8.subarray(i,i+C)); return btoa(s); },
+  u8(b64){ const b=atob(b64); const u=new Uint8Array(b.length); for(let i=0;i<b.length;i++) u[i]=b.charCodeAt(i); return u; },
+
+  async deriva(passphrase, salt, giri){
+    const base=await crypto.subtle.importKey('raw', new TextEncoder().encode(passphrase), 'PBKDF2', false, ['deriveKey']);
+    return crypto.subtle.deriveKey(
+      {name:'PBKDF2', salt, iterations:giri||GIRI_PBKDF2, hash:'SHA-256'},
+      base, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']);
+  },
+  async cifra(u8){
+    const iv=this.rnd(12);                                   // nonce sempre nuovo
+    const out=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM', iv}, this.chiave, u8));
+    return {iv, dati:out};
+  },
+  async decifra(iv, dati){
+    return new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM', iv:new Uint8Array(iv)}, this.chiave, new Uint8Array(dati)));
+  },
+  /* busta salvata su disco: sale in chiaro (serve), tutto il resto cifrato */
+  async impacchetta(obj){
+    const gz=await Zip.packJSON(obj);
+    const {iv,dati}=await this.cifra(gz);
+    /* il nome resta in chiaro solo per salutare alla porta; l'email sta dentro, cifrata */
+    const nome = obj && obj.utente && obj.utente.nome ? String(obj.utente.nome).slice(0,60) : undefined;
+    return {cifrato:1, v:1, giri:GIRI_PBKDF2, salt:this.b64(this.salt), iv:this.b64(iv), dati:this.b64(dati), nome};
+  },
+  async spacchetta(busta){
+    const gz=await this.decifra(this.u8(busta.iv), this.u8(busta.dati));
+    return Zip.unpackJSON(gz);
+  },
+  /* prova la passphrase contro la busta: se sbagliata GCM fallisce l'autenticazione */
+  async sblocca(passphrase, busta){
+    this.salt=this.u8(busta.salt);
+    this.chiave=await this.deriva(passphrase, this.salt);
+    const dati=await this.spacchetta(busta);                 // lancia se la passphrase è errata
+    this.attiva=true; Store.protetto=true; return dati;
+  },
+  async proteggi(passphrase){
+    this.salt=this.rnd(16);
+    this.chiave=await this.deriva(passphrase, this.salt);
+    this.attiva=true; Store.protetto=true;
+  },
+  spegni(){ this.chiave=null; this.salt=null; this.attiva=false; }
+};
+
+/* ===================== copie su file (.certosa) =====================
+   la copia scaricata ha una password TUTTA SUA, scelta al salvataggio e
+   richiesta al caricamento: sale e nonce nuovi a ogni file, chiave mai
+   condivisa con quella dell'archivio. Formato binario:
+     'CRTS' 0x02 0x00 | giri (uint32 BE) | sale (16) | nonce (12) | AES-256-GCM
+   l'intestazione e' autenticata (AAD): chi la ritocca rompe la decifratura. */
+const Copia = {
+  MAGIA:[0x43,0x52,0x54,0x53,0x02,0x00], TESTA:6+4+16+12,
+  cifrata(u8){ return u8.length>this.TESTA && this.MAGIA.every((b,i)=>u8[i]===b); },
+  async cifra(u8, password){
+    const salt=Cripto.rnd(16), iv=Cripto.rnd(12);
+    const testa=new Uint8Array(this.TESTA); testa.set(this.MAGIA,0);
+    new DataView(testa.buffer).setUint32(6, GIRI_PBKDF2, false);
+    testa.set(salt,10); testa.set(iv,26);
+    const k=await Cripto.deriva(password, salt, GIRI_PBKDF2);
+    const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM', iv, additionalData:testa}, k, u8));
+    const out=new Uint8Array(testa.length+ct.length); out.set(testa,0); out.set(ct,testa.length); return out;
+  },
+  async decifra(u8, password){
+    if(!this.cifrata(u8)||u8.length<this.TESTA+16)throw new Error(T('intestazione non valida'));
+    const testa=u8.slice(0,this.TESTA);
+    const giri=new DataView(testa.buffer).getUint32(6,false);
+    if(giri<100000 || giri>20000000) throw new Error(T('intestazione non valida'));
+    const k=await Cripto.deriva(password, testa.slice(10,26), giri);
+    return new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM', iv:testa.slice(26,38), additionalData:testa}, k, u8.slice(this.TESTA)));
+  }
+};
+
+
+</script>

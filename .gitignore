@@ -14,3 +14,11 @@ ready.json
 seed.html
 lab.json
 cache-node/
+
+# Private archive-engine runtime and synthetic evidence
+/verifiche/
+certosa-archives/
+archive-service.json
+archive-engine.json
+*.certosa.lock
+*.write-*

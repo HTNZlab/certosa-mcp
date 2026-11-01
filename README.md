@@ -1,87 +1,112 @@
-# Certosa MCP — local test-library connector
+# Certosa MCP — standalone local archive engine
 
-Version 0.0.2-alpha.3 implements a working **local stdio MCP server** backed by
-Certosa's real encrypted browser archive in an isolated test profile. It can
-search/read the authorised notebook, preview and persist page edits, and use a
-fictional credential against a loopback authentication fixture without returning
-its value to the model. It is not connected to any provider account or directory.
+Version **0.0.3-alpha.1** opens and edits `.certosa` files directly, without the
+Certosa application, browser, PWA or IndexedDB. Archives stay on the device.
+The existing CRTS2 format is retained: PBKDF2-SHA256, gzip before AES-256-GCM,
+and an authenticated header. No new storage format or archive migration.
 
-## Run the local lab
+## Install and configure
 
-Requires Node.js 22+, a trusted local Certosa PWA folder with `app.html` and its
-assets, and an isolated browser profile. Certosa itself is not bundled. Keep all
-runtime files, browser profiles, temporary files and caches in your own project.
+Requires Node.js22+. The local file/password/consent window currently requires
+Windows PowerShell and Windows Forms. Other operating systems fail closed for
+local unlock; they are not claimed supported by the desktop interaction flow.
+Set TEMP/TMP/TMPDIR and npm/Node caches inside your approved project first.
 
 ```sh
-git clone https://github.com/HTNZlab/certosa-mcp.git
-cd certosa-mcp
 npm ci --ignore-scripts
-npm test
-node src/lab-setup.mjs --project /absolute/project --site /absolute/project/certosa-pwa --out /absolute/project/test-lab --browser /absolute/path/chrome
+node src/archive-setup.mjs --project /absolute/project --out /absolute/project/certosa-archives
 ```
 
-The lab generates a minimal synthetic `Usi Interessanti` notebook. The optional
-`--library` argument accepts the matching native single-notebook test archive.
-An existing output/profile is preserved. See [full lab instructions](LIVE-LAB.md)
-for restarting it and for local MCP client configurations.
+The setup preserves existing runtimes. It prepares local Codex TOML/Claude JSON
+examples containing paths only. Configure an MCP stdio client with:
 
-In Certosa choose your own local archive password, then click **Chat**, beside Menu, and choose Collega per 15 minuti. The button
-is at the top of an open notebook and at the bottom-right of the room. A missing
-pairing now leaves the controls visible with an explanation. Configure a local stdio-capable client to launch
-`node src/mcp-server.mjs /absolute/project/test-lab/pairing.json`. Do not copy the
-pairing token or archive password into tool arguments or a chat. An already-open
-chat may need to reload its MCP configuration; verify its tool inventory.
+```json
+{"mcpServers":{"certosa_archives":{"command":"node","args":["/absolute/repo/src/archive-mcp-server.mjs","/absolute/project/certosa-archives/archive-engine.json"],"env":{"TEMP":"/absolute/project/certosa-archives/.tmp","TMP":"/absolute/project/certosa-archives/.tmp","TMPDIR":"/absolute/project/certosa-archives/.tmp","NODE_COMPILE_CACHE":"/absolute/project/certosa-archives/cache-node"}}}}
+```
 
-## What works
+Ask the chat to **open a Certosa archive**. `open_archive` responds immediately
+while a native local window asks you to select a `.certosa` file, unlock it and
+select the notebooks to authorise for15minutes. No notebooks are selected by
+default. Files inside the configured project are updated directly. For a selected file
+outside it, the local unlock window announces an encrypted working copy under
+<runtime>/archives. Edits affect that copy and leave the original untouched;
+even a historical clear export is encrypted before writing the working copy. The file
+password can differ from the browser library password. Historical clear exports
+are accepted with a locally chosen password protecting subsequent saves.
 
-- Eight schema-validated MCP tools using the official SDK and stdio transport.
-- Scoped list/read/search, with native search and notebook/page/revision references.
-- Prepare/review/apply page edits through native encryption and atomic revision checks.
-- Append preserves existing formatting; replace writes plain-text paragraphs.
-- Notes/attachment metadata are preserved; a pre-write encrypted checkpoint is kept.
-- Local undo of the last edit, provided no later write changed the revision.
-- Owner consent, expiry, revocation on archive lock/replacement, stale-edit rejection.
-- One-use fictional authentication, returning only an opaque handle and fixed status.
+Passwords never enter tool arguments, results, URLs, logs or configuration.
+The native helper sends its result through an anonymous local pipe to the key
+derivator. Keys remain in the local service and are released on close/expiry.
+No Certosa app, browser profile or provider API key is needed for the engine.
+The service survives reconnecting a chat client. `close_archive` revokes access.
 
-27 domain unit tests pass. A separate 37-check full-app integration run checks real SDK
-client/server communication, browser persistence after reload, undo, conflicts,
-failed saves, consent/revocation and a generated credential excluded from the
-MCP transcript. These are synthetic headless tests, not physical-phone or
-ChatGPT/Claude/Grok account qualification.
+## Tools
 
-Collection proposals remain available in the core library but are not exposed
-by this server until their persistence/rendering path is completed. There are
-no delete, raw secret read, arbitrary URL, shell or filesystem tools.
+- `open_archive`, `get_archive_status`, `close_archive`.
+- `list_notebooks`, `read_notebook`, `search_notebooks`, `count_word`.
+- `prepare_edit`, `read_proposal`, `apply_proposal`.
 
-## Credential boundary
+The model cannot pass a filesystem path or password to `open_archive`.
+Read/search/write scope is granted by the owner locally. A read-only option is
+available. System notebooks, trash and notebooks with `sensitivity: secret` or
+`localCredential` are excluded from generic tools. A title such as Passwords
+alone does not classify data: exclude unclassified credential notebooks from
+the local consent selection. No personal secret retrieval/use executor is
+provided by this archive engine. The old browser fixture demo remains separate.
 
-The browser generates a fictional random value and saves it in a notebook marked
-`sensitivity: "secret"` within the encrypted archive. This notebook is excluded
-from generic tools. A fixed lab-only executor maps the logical HTTPS fixture
-origin to the loopback HTTP test service; this does not qualify external TLS,
-redirects or a real website login. No real credential integration is shipped.
-The service keeps only a digest in RAM and never logs request bodies. Raw
-passwords, cookies, tokens and debug messages are not returned to the model.
+`count_word` computes exact whole-word totals across authorised pages and notes,
+excluding titles and trash. Case-insensitive by default; locations are bounded
+but totals are exact. Search reuses Certosa's text search. HTML is parsed as data,
+never executed. Model edits supply escaped plain text rather than executable HTML.
 
-Local code with the same user/origin privileges is trusted. The capability core
-is not an isolation boundary against malicious code already running there.
-Revoking an action after dispatch does not guarantee rollback: its outcome may
-be indeterminate. Never automatically retry an uncertain write or authentication.
+## Writes and recovery
 
-## Privacy and scope
+Read the revision, prepare/review a proposal, then apply it once. Before commit,
+the engine checks source bytes, revision and permissions. A cooperative lock
+coordinates engine writers. It creates an encrypted recovery copy, writes and
+flushes an encrypted temporary file on the same filesystem, and replaces the
+original. Notes, attachments, unknown fields and excluded notebooks are preserved.
+The updated file can be read/imported by Certosa's existing format functions.
+An already-open browser database is not implicitly updated from this file.
 
-Only the synthetic library is supported in this alpha. The public Certosa PWA
-is unchanged. No personal profile, archive, private Git history or working log
-is included in the source or package. There is no content database in the bridge,
-telemetry or cloud relay. The browser stores the archive on the device; local
-pairing files are created in the operator-selected project. A remote model will
-see the notebook excerpts that its authorised tools return. There is no provider
-OAuth flow or ChatGPT/Claude/Grok web connector yet. Mobile background suspension
-can make the device temporarily unavailable.
+Never automatically repeat a write after timeout or an uncertain outcome: read
+back first. Backups are retained; this release does not automatically delete them.
+The lock/hash checks do not provide collaborative editing with external programs
+that ignore the lock. A stale lock after a hard crash requires local verification;
+it is not silently removed. File operations remain inside the configured project.
 
-See [distribution and provider submission](DISTRIBUTION.md). No submission or
-approval is claimed. This is not an official OpenAI, Anthropic or xAI product.
-Do not post personal notebooks or credentials in issues.
+## Capacity and roadmap
 
-Code: MIT, copyright 2026 Daniele Nencini per HTNZLab. Search test support is from
-the same MIT-licensed Certosa project. [Italiano](README.it.md).
+Experimental limits:256MiB file,512MiB expanded JSON,10,000pages/notebook and
+100,000page-array entries/archive. This is a compatibility release, not a GB-scale
+qualification. The current format authenticates/decrypts the whole payload and
+recompresses/re-encrypts the archive for each write; full recovery copies also
+consume space. Increasing a page-count constant does not solve those costs.
+
+Large illustrated books need work/edition metadata (authors, translators,
+illustrators, provenance/rights), semantic chapter anchors and image placements
+independent of reflowed page numbers. These catalogue features are not implemented.
+An incremental encrypted catalogue plus immutable encrypted media blocks is a
+candidate backend to benchmark. Original media should remain unchanged; derived
+previews are separate. No storage migration is performed in this release.
+
+## Validation and boundaries
+
+50 domain/engine tests,23 SDK stdio-to-file checks and5 service boot/restart checks
+cover original-format interoperation, password/tamper rejection, local consent,
+scopes, exact counting, encrypted writes/recovery, field/media preservation,
+conflicts, failed replacement, lock/expiry, junction confinement and reconnects.
+All archives/credentials are synthetic. The owner native-window interaction is
+separate from injected UI providers in automated tests. No physical-phone, GB-scale,
+provider-account, remote-web gateway or directory submission is claimed.
+
+```sh
+npm test
+```
+
+The package contains source/contracts/docs only: no app, archive, browser profile,
+private history, pairing, runtime, password or content logs. Code is MIT; see LICENSE
+and dependency notices. Native crypto/search test support comes from Certosa.
+
+The earlier browser-based synthetic lab remains documented in [LIVE-LAB.md](LIVE-LAB.md).
+See [Italian guide](README.it.md) and [distribution/submission status](DISTRIBUTION.md).

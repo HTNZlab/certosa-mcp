@@ -1,0 +1,78 @@
+param([ValidateSet('choose','unlock','grant','notice')][string]$Mode)
+$ErrorActionPreference='Stop'
+[Console]::InputEncoding=[System.Text.UTF8Encoding]::new($false)
+[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false)
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+[System.Windows.Forms.Application]::EnableVisualStyles()
+function Reply($value){[Console]::Out.Write(($value|ConvertTo-Json -Compress -Depth 8))}
+try {
+  $data=[Console]::In.ReadToEnd()|ConvertFrom-Json
+  $form=New-Object System.Windows.Forms.Form
+  $form.Text='Certosa · Archivio locale'
+  $form.Width=580;$form.Height=440;$form.StartPosition='CenterScreen';$form.TopMost=$true
+  $form.Font=[System.Drawing.Font]::new('Segoe UI',10)
+  if($Mode -eq 'notice'){
+    [void][System.Windows.Forms.MessageBox]::Show($form,[string]$data.message,'Certosa · Archivio locale',[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Information)
+    Reply @{acknowledged=$true};$form.Dispose();exit
+  }
+  if($Mode -eq 'choose'){
+    $picker=New-Object System.Windows.Forms.OpenFileDialog
+    $picker.Title='Apri un archivio .certosa per la chat'
+    $picker.Filter='Archivi Certosa (*.certosa)|*.certosa'
+    $picker.InitialDirectory=[string]$data.directory
+    $picker.CheckFileExists=$true;$picker.Multiselect=$false
+    $form.Height=170
+    $intro=New-Object System.Windows.Forms.Label
+    $intro.Text='Scegli il file .certosa. Password e autorizzazione saranno richieste qui, sul dispositivo.'
+    $intro.SetBounds(20,20,520,80);$form.Controls.Add($intro)
+    $form.Show();$form.Activate()
+    if($picker.ShowDialog($form) -eq [System.Windows.Forms.DialogResult]::OK){Reply @{path=$picker.FileName}}else{Reply @{cancelled=$true}}
+    $picker.Dispose();$form.Dispose();exit
+  }
+  $label=New-Object System.Windows.Forms.Label
+  $label.SetBounds(20,18,525,105);$label.AutoSize=$false
+  $form.Controls.Add($label)
+  $ok=New-Object System.Windows.Forms.Button
+  $ok.SetBounds(195,345,235,36);$ok.DialogResult=[System.Windows.Forms.DialogResult]::OK
+  $cancel=New-Object System.Windows.Forms.Button
+  $cancel.Text='Annulla';$cancel.SetBounds(435,345,105,36);$cancel.DialogResult=[System.Windows.Forms.DialogResult]::Cancel
+  $form.Controls.AddRange(@($ok,$cancel));$form.AcceptButton=$ok;$form.CancelButton=$cancel
+  if($Mode -eq 'unlock'){
+    $label.Text=if($data.encrypted){"Sblocca $($data.name).`r`nLa password viene usata soltanto sul dispositivo. Non viene inviata alla chat."}else{"$($data.name) non e protetto.`r`nScegli una password per cifrare i prossimi salvataggi nel formato Certosa attuale."}
+    if($data.copyTo){$label.Text+="`r`nCopia di lavoro cifrata in $($data.copyTo). L'originale resta al suo posto."}
+    if($data.retry){$label.Text+="`r`nSblocco non riuscito: controlla la password e riprova."}
+    $box=New-Object System.Windows.Forms.TextBox
+    $box.SetBounds(20,140,520,30);$box.UseSystemPasswordChar=$true
+    $form.Controls.Add($box)
+    $repeat=New-Object System.Windows.Forms.TextBox
+    $repeat.SetBounds(20,220,520,30);$repeat.UseSystemPasswordChar=$true
+    if(-not $data.encrypted){
+      $hint=New-Object System.Windows.Forms.Label;$hint.Text='Ripeti la password';$hint.SetBounds(20,190,520,25)
+      $form.Controls.AddRange(@($hint,$repeat))
+    }
+    $ok.Text='Sblocca in locale';$ok.Enabled=$false
+    $validate={ $ok.Enabled=$box.Text.Length -gt 0 -and ($data.encrypted -or $box.Text -ceq $repeat.Text) }
+    $box.Add_TextChanged($validate);$repeat.Add_TextChanged($validate)
+    $form.Add_Shown({$box.Focus()})
+    if($form.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK){Reply @{password=$box.Text}}else{Reply @{cancelled=$true}}
+    $box.Clear();$repeat.Clear();$form.Dispose();exit
+  }
+  $label.Text="Scegli i quaderni accessibili alla chat per 15 minuti.`r`nGli estratti richiesti saranno leggibili dalla chat. Deseleziona i quaderni con password o altri segreti; quelli classificati riservati sono gia esclusi."
+  $all=New-Object System.Windows.Forms.CheckBox
+  $all.Text='Seleziona tutti i quaderni disponibili';$all.SetBounds(20,125,520,28)
+  $list=New-Object System.Windows.Forms.CheckedListBox
+  $list.SetBounds(20,158,520,140);$list.CheckOnClick=$true
+  foreach($notebook in $data.notebooks){[void]$list.Items.Add(($notebook.title+' · '+$notebook.volume),$false)}
+  $all.Add_CheckedChanged({for($i=0;$i -lt $list.Items.Count;$i++){$list.SetItemChecked($i,$all.Checked)}})
+  $write=New-Object System.Windows.Forms.CheckBox
+  $write.Text='Consenti anche le modifiche con copia di recupero cifrata';$write.SetBounds(20,305,520,30);$write.Checked=$true
+  $ok.Text='Autorizza per 15 minuti';$ok.Enabled=$false
+  $list.Add_ItemCheck({param($sender,$eventArgs) $count=$list.CheckedItems.Count;if($eventArgs.NewValue -eq [System.Windows.Forms.CheckState]::Checked){$count++}else{$count--};$ok.Enabled=$count -gt 0})
+  $form.Controls.AddRange(@($all,$list,$write))
+  if($form.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK){
+    $ids=@();foreach($index in $list.CheckedIndices){$ids+=$data.notebooks[$index].id}
+    Reply @{notebookIds=@($ids);write=$write.Checked}
+  }else{Reply @{cancelled=$true}}
+  $form.Dispose()
+} catch { Reply @{error='LOCAL_DIALOG_UNAVAILABLE'};exit 1 }
