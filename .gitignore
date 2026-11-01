@@ -1,0 +1,7 @@
+node_modules/
+*.certosa
+*.tgz
+.env*
+var/
+profiles/
+logs/

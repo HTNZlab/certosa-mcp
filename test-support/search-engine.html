@@ -1,0 +1,129 @@
+<script>
+/* Pure local search over the caller's plain-text snapshot. No storage, network,
+   OCR, generated code, or independent notebook catalogue. */
+(()=>{
+  'use strict';
+  const MODES=new Set(['all','any','exact']);
+  const STOP_WORDS=new Set(('il lo la i gli le un uno una l di d del dello della dei degli delle dell a al allo alla ai agli alle all da dal dallo dalla dai dagli dalle dall in nel nello nella nei negli nelle nell con col coi su sul sullo sulla sui sugli sulle sull per tra fra e ed o').split(' '));
+  const MAX_QUERY=240,MAX_GROUPS=16,CHUNK_SIZE=30;
+  function tokens(text){
+    const out=[],pattern=/[\p{L}\p{N}][\p{L}\p{N}\p{M}]*/gu;
+    let match;
+    while((match=pattern.exec(text))!==null){
+      const value=match[0].normalize('NFD').replace(/\p{M}/gu,'').toLocaleLowerCase('it');
+      if(value)out.push({value,start:match.index,end:match.index+match[0].length});
+    }
+    return out;
+  }
+  function parse(query,mode='all'){
+    const fail=error=>({error,positives:[],excluded:[],mode,normalizedQuery:''});
+    if(!MODES.has(mode))return fail('Modalità di ricerca non valida.');
+    if(typeof query!=='string')return fail('La ricerca deve essere testo.');
+    if(query.length>MAX_QUERY)return fail('La ricerca può contenere al massimo 240 caratteri.');
+    const positiveRaw=[],excluded=[];
+    let i=0,count=0;
+    while(i<query.length){
+      while(i<query.length&&/\s/u.test(query[i]))i++;
+      if(i===query.length)break;
+      const negative=query[i]==='-';
+      if(negative){i++;if(i===query.length||/\s/u.test(query[i]))return fail('Scrivi un termine subito dopo il segno meno.');}
+      const phrase=query[i]==='"';
+      let raw='';
+      if(phrase){
+        const start=++i;
+        while(i<query.length&&query[i]!=='"')i++;
+        if(i===query.length)return fail('Chiudi tutte le frasi tra virgolette.');
+        raw=query.slice(start,i++);
+        if(i<query.length&&!/\s/u.test(query[i]))return fail('Separa la frase tra virgolette dagli altri termini.');
+      }else{
+        const start=i;
+        while(i<query.length&&!/\s/u.test(query[i])){
+          if(query[i]==='"')return fail('Le virgolette devono racchiudere una frase completa.');
+          i++;
+        }
+        raw=query.slice(start,i);
+      }
+      const words=tokens(raw).map(t=>t.value);
+      if(!words.length)return fail('Usa almeno una parola o un numero per ogni termine.');
+      const groups=phrase?[{kind:'phrase',value:words.join(' ')}]:words.map(value=>({kind:'word',value}));
+      count+=groups.length;
+      if(count>MAX_GROUPS)return fail('La ricerca può contenere al massimo 16 gruppi.');
+      (negative?excluded:positiveRaw).push(...groups);
+    }
+    if(!positiveRaw.length)return fail('Scrivi almeno un termine da cercare, oltre alle eventuali esclusioni.');
+    // Keep the whole positive query for adjacency relevance and exact mode,
+    // including articles ignored for ordinary word matching.
+    const normalizedQuery=positiveRaw.map(g=>g.value).join(' ');
+    let positives;
+    if(mode==='exact')positives=[{kind:'phrase',value:normalizedQuery}];
+    else{
+      positives=positiveRaw.filter(g=>g.kind==='phrase'||!STOP_WORDS.has(g.value));
+      if(!positives.length)positives=positiveRaw;
+    }
+    const unique=groups=>groups.filter((g,j)=>groups.findIndex(x=>x.kind===g.kind&&x.value===g.value)===j);
+    return {error:null,positives:unique(positives),excluded:unique(excluded),mode,normalizedQuery};
+  }
+  function occurrences(documentTokens,values){
+    const found=[];
+    for(let i=0;i+values.length<=documentTokens.length;i++){
+      let match=true;
+      for(let j=0;j<values.length;j++)if(documentTokens[i+j].value!==values[j]){match=false;break;}
+      if(match)found.push({start:documentTokens[i].start,end:documentTokens[i+values.length-1].end});
+    }
+    return found;
+  }
+  function mergeRanges(ranges){
+    const sorted=ranges.sort((a,b)=>a.start-b.start||a.end-b.end),merged=[];
+    for(const range of sorted){
+      const previous=merged[merged.length-1];
+      if(previous&&range.start<=previous.end)previous.end=Math.max(previous.end,range.end);
+      else merged.push({start:range.start,end:range.end});
+    }
+    return merged;
+  }
+  async function scan(entries,parsed,{signal,onProgress,isCurrent}={}){
+    if(!Array.isArray(entries))throw new TypeError('Serve uno snapshot di documenti.');
+    if(!parsed||parsed.error||!MODES.has(parsed.mode)||!Array.isArray(parsed.positives)||!parsed.positives.length||!Array.isArray(parsed.excluded))throw new TypeError('Usa una ricerca valida restituita da parse.');
+    const compile=g=>{
+      if(!g||!['word','phrase'].includes(g.kind)||typeof g.value!=='string'||!g.value)throw new TypeError('Gruppo di ricerca non valido.');
+      return {kind:g.kind,values:g.value.split(' ')};
+    };
+    const positive=parsed.positives.map(compile),negative=parsed.excluded.map(compile);
+    const wholeQuery=typeof parsed.normalizedQuery==='string'?parsed.normalizedQuery.split(' ').filter(Boolean):positive.flatMap(g=>g.values);
+    const totalDocuments=entries.length,hits=[];
+    let scannedDocuments=0;
+    const cancelled=()=>!!signal?.aborted||(typeof isCurrent==='function'&&!isCurrent());
+    const progress=wasCancelled=>{if(typeof onProgress==='function')onProgress({totalDocuments,scannedDocuments,hits:hits.length,cancelled:wasCancelled});};
+    const finish=wasCancelled=>{
+      hits.sort((a,b)=>b.hit.score-a.hit.score||a.order-b.order||a.index-b.index);
+      return {cancelled:wasCancelled,hits:hits.map(x=>x.hit),totalDocuments,scannedDocuments};
+    };
+    if(cancelled()){progress(true);return finish(true);}
+    progress(false);
+    for(let start=0;start<totalDocuments;start+=CHUNK_SIZE){
+      if(cancelled()){progress(true);return finish(true);}
+      const end=Math.min(start+CHUNK_SIZE,totalDocuments);
+      for(let index=start;index<end;index++){
+        const entry=entries[index];
+        if(!entry||typeof entry.text!=='string'||!['title','page','note'].includes(entry.where))throw new TypeError('Ogni documento richiede testo semplice e una provenienza valida.');
+        const documentTokens=tokens(entry.text);
+        scannedDocuments++;
+        if(negative.some(g=>occurrences(documentTokens,g.values).length))continue;
+        const matches=positive.map(g=>occurrences(documentTokens,g.values));
+        const matchedGroups=matches.filter(x=>x.length).length;
+        if(parsed.mode==='any'?matchedGroups===0:matchedGroups!==positive.length)continue;
+        const ranges=matches.flat(),occurrenceCount=ranges.length;
+        const matchedPhrases=positive.filter((g,j)=>g.kind==='phrase'&&matches[j].length).length;
+        const adjacent=wholeQuery.length>0&&occurrences(documentTokens,wholeQuery).length>0;
+        const score=matchedGroups*100+Math.min(occurrenceCount,20)*5+matchedPhrases*40+(adjacent?120:0)+(entry.where==='title'?90:0);
+        hits.push({index,order:Number.isFinite(entry.order)?entry.order:index,hit:{...entry,score,ranges:mergeRanges(ranges),occurrenceCount}});
+      }
+      progress(false);
+      if(cancelled()){progress(true);return finish(true);}
+      if(end<totalDocuments)await new Promise(resolve=>setTimeout(resolve,0));
+    }
+    return finish(false);
+  }
+  window.CertosaSearchEngine=Object.freeze({parse,scan});
+})();
+</script>

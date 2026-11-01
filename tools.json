@@ -1,0 +1,324 @@
+{
+  "prototype": true,
+  "transportImplemented": false,
+  "tools": [
+    {
+      "name": "list_notebooks",
+      "description": "List only the personal notebooks explicitly granted in this local session.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "title": "Find my notebooks"
+    },
+    {
+      "name": "read_notebook",
+      "description": "Read bounded plain-text pages and notes from an authorised notebook; no credentials or raw HTML.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "notebookId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "startPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20
+          }
+        },
+        "required": [
+          "notebookId"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "title": "Read selected notebook pages"
+    },
+    {
+      "name": "search_notebooks",
+      "description": "Search only authorised local notebook text and notes; return source locations and revision.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "title": "Find a passage in my notebooks"
+    },
+    {
+      "name": "prepare_collection",
+      "description": "Prepare an in-memory preview of series and volumes. Does not create notebooks or persist content.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "series": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "volumes": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 50,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "pageCapacity": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 10000
+                      },
+                      "content": {
+                        "type": "array",
+                        "maxItems": 10000,
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "number": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 10000
+                            },
+                            "text": {
+                              "type": "string",
+                              "maxLength": 100000
+                            },
+                            "source": {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "enum": [
+                                    "chat",
+                                    "manual",
+                                    "note",
+                                    "other"
+                                  ]
+                                },
+                                "reference": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 1000
+                                }
+                              },
+                              "required": [
+                                "kind",
+                                "reference"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "number",
+                            "text"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "pageCapacity"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "title",
+                "volumes"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "enum": [
+                  "chat",
+                  "manual",
+                  "note",
+                  "other"
+                ]
+              },
+              "reference": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              }
+            },
+            "required": [
+              "kind",
+              "reference"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "series"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "title": "Draft a new notebook collection"
+    },
+    {
+      "name": "prepare_edit",
+      "description": "Prepare an append/replace preview bound to a revision. Never commits the edit.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "notebookId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "pageNumber": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000
+          },
+          "baseRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "mode": {
+            "enum": [
+              "append",
+              "replace"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 100000
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "enum": [
+                  "chat",
+                  "manual",
+                  "note",
+                  "other"
+                ]
+              },
+              "reference": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              }
+            },
+            "required": [
+              "kind",
+              "reference"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "notebookId",
+          "pageNumber",
+          "baseRevision",
+          "mode",
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "title": "Preview a change to a notebook"
+    },
+    {
+      "name": "read_proposal",
+      "description": "Read an existing local preview and whether its source revision is stale.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "proposalId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "proposalId"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "title": "Review a proposed change"
+    }
+  ]
+}

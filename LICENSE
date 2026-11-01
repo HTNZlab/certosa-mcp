@@ -1,0 +1,61 @@
+# MIT License
+
+Copyright (c) 2026 Daniele Nencini per HTNZLab
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+## Appendice: componente facoltativo di lettura locale / Optional local reader
+
+La licenza MIT sopra riportata regola l'applicazione
+Certosa e non sostituisce le licenze dei componenti di terzi. Il modello
+Supertonic 3, i preset F1/M1 inclusi e i derivati del modello nel lettore
+facoltativo sono soggetti a **OpenRAIL-M**, separatamente dalla licenza MIT dell’applicazione. Il
+codice helper e ONNX Runtime Web mantengono le rispettive licenze MIT.
+
+Per il solo componente di lettura locale, i
+[termini del componente](assets/lettura-it/LICENSES/MODEL-USE.txt) e la
+[licenza OpenRAIL-M completa](assets/lettura-it/LICENSES/SUPERTONIC-MODEL-OPENRAIL-M.txt),
+compresa la sezione 5 e l'Attachment A (Use Restrictions), sono incorporati
+per riferimento in questa appendice e ne costituiscono condizioni
+applicabili. Ogni uso e redistribuzione del modello o dei suoi derivati
+deve rispettare tutti i divieti dell'Attachment A e le altre condizioni
+OpenRAIL-M. Chi redistribuisce deve includere le restrizioni d'uso come
+obblighi applicabili nell'accordo con i destinatari successivi, fornire una
+copia della licenza completa e conservare gli avvisi richiesti, secondo
+la sezione 4. Questa appendice non modifica la licenza OpenRAIL-M né
+estende la licenza del modello all'applicazione.
+
+The MIT License above governs the Certosa
+application and does not replace third-party licenses. The optional
+reader's Supertonic 3 model, included F1/M1 presets, and Model Derivatives
+are licensed under **OpenRAIL-M**, separately from the application’s MIT license. The helper code
+and ONNX Runtime Web retain their respective MIT licenses.
+
+Solely for this optional reader component, the linked component terms and
+complete OpenRAIL-M license, including paragraph 5 and Attachment A (Use
+Restrictions), are incorporated by reference into this appendix as
+applicable conditions. Every use and redistribution of the model or its
+derivatives must comply with all Attachment A prohibitions and the other
+OpenRAIL-M conditions. A redistributor must include the use-based
+restrictions as enforceable provisions in the agreement with downstream
+recipients, give them a copy of the complete license, and retain required
+notices under paragraph 4. This appendix does not amend OpenRAIL-M or
+extend the model license to the application.
