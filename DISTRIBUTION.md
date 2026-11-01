@@ -8,10 +8,10 @@ con il quaderno «Usi Interessanti», orientato a bisogni umani.
 ## Stato reale
 
 Repository pubblico: [HTNZlab/certosa-mcp](https://github.com/HTNZlab/certosa-mcp).
-La prerelease 0.0.4-alpha.1 aggiunge il backend incrementale cifrato `.certosa-db`,
+La prerelease 0.0.5-alpha.1 aggiunge il backend incrementale cifrato `.certosa-db`,
 conservando lettura/scrittura/export del formato `.certosa`. Solo il campo autore
 viene aggiunto. Importazione crea una copia, nessuna migrazione automatica.
-Quattordici strumenti MCP locali, scelta/password/consenso su Windows, copia
+Diciassette strumenti MCP locali, scelta/password/consenso su Windows, copia
 cifrata consistente anche per archivi grandi. Dettagli e limiti nel README.
 Collaudo sintetico reale: 40.000 pagine e 1 GiB di media, checksum verificato;
 una pagina più autore scrivono circa 86 KB senza riscrivere i media.
@@ -21,6 +21,7 @@ Non esportare archivi, credenziali, cronologia privata, profili, runtime o log.
 Release con pacchetto e checksum; codice MIT, dipendenze con proprie licenze.
 Non qualificati telefoni, account provider e integrazione nella PWA pubblica.
 
+Pacchetti installabili MCPB/ZIP portatile e skill: vedere INSTALL.md.
 Il trasporto è MCP stdio locale. Non è un endpoint remoto per ChatGPT/Claude web.
 Questi richiedono un ponte autorizzato al dispositivo ancora da implementare;
 gli estratti richiesti diventano visibili al provider della chat. Nessuna

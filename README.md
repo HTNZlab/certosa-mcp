@@ -1,4 +1,35 @@
-# Certosa MCP — incremental local archive engine · 0.0.4-alpha.1
+# Certosa MCP — incremental local archive engine · 0.0.5-alpha.1
+
+<img src="assets/certosa.png" alt="Certosa: a monk writing by candlelight" width="360">
+
+## Installable archive recognition and complete editing workflow
+
+Version0.0.5-alpha.1 adds a Claude Desktop `.mcpb`, a portable Windows ZIP with
+locked dependencies, client configuration generator and an optional skill.
+See [installation](INSTALL.md). The MCP initialisation instructions teach the
+host/model to recognise `.certosa` and request local unlock; no model weights
+or OS file associations are changed.
+
+New tools: `get_archive_capabilities`, `prepare_archive_edit`, `validate_archive`.
+The17tools include atomic batches: create notebooks, write multiple pages,
+set author/font and increase capacity (100operations/200000new characters).
+Creation needs a separate local grant. Prompts and `certosa://archive-workflow`
+make the workflow discoverable on compatible hosts.
+
+Final export is a real CRTS2 `.certosa`: validate schema/media and the original
+app import planner, reopen the written encrypted temporary file with original
+Certosa Zip/Copia functions, and compare every serialised value before publishing.
+Success reports `nativeReaderVerified`, `nativeImportPlanVerified` and
+`allValuesPreserved`. Existing destinations are retained. Verification covers
+the included current functions; future app versions and mobile rendering have
+their own qualification requirements.
+
+81passing regressions cover atomic creation/editing on both backends, full
+rollback, permissions/conflicts, missing media, incompatible volume metadata,
+concurrent export, actual SDK calls and generated desktop configurations.
+The owner previously verified native unlock/import/backup, but these new bundles
+have not been installed in their Claude/ChatGPT accounts. No directory submission.
+
 
 Read, search and edit local archives without opening Certosa or a browser.
 This release adds **author only**: readable, searchable and editable through a
@@ -52,7 +83,7 @@ are excluded. A title such as Passwords alone does not classify data: exclude
 unclassified credential notebooks locally. No personal credential executor is
 provided. Authorised requested excerpts are visible to the chat and its provider.
 
-## Fourteen tools
+## Seventeen tools
 
 - `open_archive`, `import_archive`, `get_archive_status`, `close_archive`.
 - `list_notebooks`, `read_notebook`, `search_notebooks`, `count_word`.

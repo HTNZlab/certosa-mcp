@@ -154,7 +154,11 @@ export function createLocalNotebookTools({readState, plainText, searchEntries, i
       text(value,500,true);
       return saveProposal(s,'propose_edit',[{type:'set_notebook_author',notebookId,beforeAuthor:author(s,nb),afterAuthor:value.trim()}]);
     }
-    return Object.freeze({list_notebooks, read_notebook, search_notebooks, prepare_collection, prepare_edit, prepare_author_edit, read_proposal, close});
+    // Trusted owner adapter only: never a transport tool. Extends the existing
+    // session after an explicitly authorised creation without resetting expiry.
+    function authoriseCreatedNotebook(id){state('propose_edit');allowed.add(text(id,128));}
+    const api={list_notebooks, read_notebook, search_notebooks, prepare_collection, prepare_edit, prepare_author_edit, read_proposal, close};
+    Object.defineProperty(api,'authoriseCreatedNotebook',{value:authoriseCreatedNotebook});return Object.freeze(api);
   }
   return Object.freeze({openSession});
 }

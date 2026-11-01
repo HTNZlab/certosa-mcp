@@ -14,11 +14,11 @@ export class LargeArchiveEngine{
     let stat;try{stat=fs.statSync(this.filename);}catch{fail('ARCHIVE_PATH_CHANGED');}
     if([stat.dev,stat.ino,stat.birthtimeMs].join(':')!==this.identity)fail('ARCHIVE_PATH_CHANGED');
   }
-  grant({notebookIds,write=false,ttlMs=900000}){
+  grant({notebookIds,write=false,ttlMs=900000,allowCreate=false}){
     if(!this.store)fail('ARCHIVE_LOCKED');
     if(!Number.isSafeInteger(ttlMs)||ttlMs<1||ttlMs>900000)fail('INVALID_GRANT');
     const eligible=new Set(this.store.books().filter(n=>!isSystemNotebook(n)&&!isSecretNotebook(n)).map(n=>n.id));
-    if(!Array.isArray(notebookIds)||!notebookIds.length||notebookIds.some(id=>!eligible.has(id)))fail('INVALID_GRANT');
+    if(!Array.isArray(notebookIds)||!notebookIds.length&&!(write&&allowCreate)||notebookIds.some(id=>!eligible.has(id)))fail('INVALID_GRANT');
     this.checkIdentity();this.session={ids:new Set(notebookIds),write,expiresAt:this.now()+ttlMs};return this.status();
   }
   status(){

@@ -73,12 +73,17 @@ try {
   $all.Add_CheckedChanged({for($i=0;$i -lt $list.Items.Count;$i++){$list.SetItemChecked($i,$all.Checked)}})
   $write=New-Object System.Windows.Forms.CheckBox
   $write.Text='Consenti anche le modifiche con copia di recupero cifrata';$write.SetBounds(20,305,520,30);$write.Checked=$true
+  $form.Height=490;$ok.Top=395;$cancel.Top=395
+  $create=New-Object System.Windows.Forms.CheckBox
+  $create.Text='Consenti anche la creazione di nuovi quaderni';$create.SetBounds(20,340,520,30);$create.Checked=$false
   $ok.Text='Autorizza per 15 minuti';$ok.Enabled=$false
-  $list.Add_ItemCheck({param($sender,$eventArgs) $count=$list.CheckedItems.Count;if($eventArgs.NewValue -eq [System.Windows.Forms.CheckState]::Checked){$count++}else{$count--};$ok.Enabled=$count -gt 0})
-  $form.Controls.AddRange(@($all,$list,$write))
+  $list.Add_ItemCheck({param($sender,$eventArgs) $count=$list.CheckedItems.Count;if($eventArgs.NewValue -eq [System.Windows.Forms.CheckState]::Checked){$count++}else{$count--};$ok.Enabled=$count -gt 0 -or ($write.Checked -and $create.Checked)})
+  $refreshGrant={$create.Enabled=$write.Checked;$ok.Enabled=$list.CheckedItems.Count -gt 0 -or ($write.Checked -and $create.Checked)}
+  $create.Add_CheckedChanged($refreshGrant);$write.Add_CheckedChanged($refreshGrant)
+  $form.Controls.AddRange(@($all,$list,$write,$create))
   if($form.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK){
     $ids=@();foreach($index in $list.CheckedIndices){$ids+=$data.notebooks[$index].id}
-    Reply @{notebookIds=@($ids);write=$write.Checked}
+    Reply @{notebookIds=@($ids);write=$write.Checked;allowCreate=($write.Checked -and $create.Checked)}
   }else{Reply @{cancelled=$true}}
   $form.Dispose()
 } catch { Reply @{error='LOCAL_DIALOG_UNAVAILABLE'};exit 1 }

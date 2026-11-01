@@ -1,4 +1,36 @@
-# Certosa MCP — archivio locale incrementale · 0.0.4-alpha.1
+# Certosa MCP — archivio locale incrementale · 0.0.5-alpha.1
+
+<img src="assets/certosa.png" alt="Certosa: a monk writing by candlelight" width="360">
+
+## Connettore installabile: riconoscere, lavorare, validare e salvare
+
+Versione0.0.5-alpha.1: pacchetto Claude Desktop `.mcpb`, ZIP portatile con
+dipendenze e configurazioni per ChatGPT/Codex e host MCP locali, skill inclusa.
+Vedi [installazione completa](INSTALL.it.md). Le istruzioni MCP insegnano al
+modello a riconoscere `.certosa` e chiedere lo sblocco nella finestra locale.
+Non cambiano i pesi del modello o le associazioni file di Windows.
+
+Nuovi strumenti: `get_archive_capabilities`, `prepare_archive_edit`,
+`validate_archive`. Un batch atomico può creare quaderni, scrivere molte pagine,
+modificare autore/font o aumentare capienza, fino100operazioni/200.000nuovi
+caratteri. La creazione richiede una scelta locale separata. Restano17strumenti
+totali, con prompt e risorsa `certosa://archive-workflow`.
+
+L'export finale è un vero `.certosa` CRTS2: verifica struttura, allegati e piano
+di importazione originale, poi rilegge il temporaneo cifrato con Zip/Copia di
+Certosa e confronta tutti i valori serializzati prima di pubblicarlo. Il
+risultato deve avere `nativeReaderVerified`, `nativeImportPlanVerified` e
+`allValuesPreserved` a true. Nessuna sovrascrittura di destinazioni esistenti.
+La compatibilità verificata riguarda le funzioni correnti incluse; renderer
+mobile e versioni future richiedono prove proprie.
+
+Test di regressione:81pass, inclusi creazione/modifica atomica su entrambi i
+backend, rollback completo, conflitti, media mancanti, volumi incompatibili,
+export concorrente, SDK reale e avvio da configurazioni desktop generate.
+La prova owner precedente ha già verificato sblocco/import/backup nativi, ma
+questi nuovi pacchetti non risultano ancora installati nei suoi account Claude
+o ChatGPT. Nessuna submission ai cataloghi.
+
 
 Il motore legge, cerca e modifica archivi senza aprire Certosa o il browser.
 Aggiunge soltanto **autore**, disponibile in lettura, ricerca e modifica con
@@ -51,7 +83,7 @@ escludere localmente eventuali quaderni di credenziali non classificati.
 Questa versione non usa credenziali personali. Gli estratti autorizzati
 richiesti sono leggibili dalla chat e dal suo provider.
 
-## Quattordici strumenti
+## Diciassette strumenti
 
 - `open_archive`, `import_archive`, `get_archive_status`, `close_archive`.
 - `list_notebooks`, `read_notebook`, `search_notebooks`, `count_word`.

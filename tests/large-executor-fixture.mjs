@@ -10,6 +10,6 @@ const ui={cancel(){},async ask(mode,input){
   if(mode==='choose')return {path:input.importing?sample.file:fs.existsSync(snapshot)?snapshot:controller.engine.active?.filename||sample.file};
   if(mode==='unlock')return {password:sample.password};
   if(mode==='save')return {path:input.incrementalCopy?snapshot:output};
-  if(mode==='grant')return {notebookIds:input.notebooks.map(n=>n.id),write:true};
+  if(mode==='grant')return {notebookIds:input.notebooks.map(n=>n.id),write:true,allowCreate:true};
 }};
 controller=runArchiveExecutor({filename:configFile,ui});

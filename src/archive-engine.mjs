@@ -54,11 +54,11 @@ export class ArchiveEngine{
     this.archiveId='archive-'+hashBytes(Buffer.from(absolute)).slice(0,24);
     return material.pack.lib.notebooks.filter(n=>!system(n)).map(n=>({id:n.id,title:material.pack.lib.series.find(s=>s.id===n.sid)?.label||'',volume:n.vol,reserved:secret(n)}));
   }
-  grant({notebookIds,write=false,ttlMs=900000}){
+  grant({notebookIds,write=false,ttlMs=900000,allowCreate=false}){
     if(!this.material)fail('ARCHIVE_LOCKED');
     if(!Number.isSafeInteger(ttlMs)||ttlMs<1||ttlMs>900000)fail('INVALID_GRANT');
     const eligible=new Set(this.material.pack.lib.notebooks.filter(n=>!system(n)&&!secret(n)).map(n=>n.id));
-    if(!Array.isArray(notebookIds)||!notebookIds.length||notebookIds.some(id=>!eligible.has(id)))fail('INVALID_GRANT');
+    if(!Array.isArray(notebookIds)||!notebookIds.length&&!(write&&allowCreate)||notebookIds.some(id=>!eligible.has(id)))fail('INVALID_GRANT');
     this.checkDisk();
     if(write){
       this.lockFile=this.filename+'.lock';this.lockToken=randomUUID();let fd;
@@ -124,7 +124,10 @@ export class ArchiveEngine{
       page.html=op.mode==='append'?(page.html||'')+textHtml(op.afterText.slice(op.beforeText.length)):textHtml(op.afterText);
       if(op.source)page.connectorSource=op.source;nb.pages[op.pageNumber]=page;
     }
-    this.applied.add(proposalId);this.busy=true;
+    this.applied.add(proposalId);const saved=this.persist(candidate);return {...saved,notebookId:nb.id,pageNumber:op.pageNumber};
+  }
+  persist(candidate){
+    this.readState();if(!this.write)fail('FORBIDDEN');this.busy=true;
     let temporary,checkpoint;
     try{
       this.checkDisk();
@@ -139,7 +142,7 @@ export class ArchiveEngine{
       this.checkDisk();
       this.io.renameSync(temporary,this.filename);temporary=null;
       this.material.pack=candidate;this.material.legacy=false;this.diskHash=hashBytes(output);this.revision++;
-      return {status:'saved',archiveId:this.archiveId,notebookId:nb.id,pageNumber:op.pageNumber,revision:this.revision,checkpoint:true,checkpointId:checkpoint};
+      return {status:'saved',archiveId:this.archiveId,revision:this.revision,checkpoint:true,checkpointId:checkpoint};
     }catch(e){throw archiveError(['REVISION_CONFLICT','SESSION_CLOSED','ARCHIVE_PATH_CHANGED'].includes(e.code)?e.code:'SAVE_FAILED');}
     finally{
       this.busy=false;

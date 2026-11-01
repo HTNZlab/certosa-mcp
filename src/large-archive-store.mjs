@@ -152,10 +152,15 @@ export class LargeArchiveStore{
     for(const object of media)pack.blobs[object.hash]=object.prefix+Buffer.concat([...this.attachment(object.hash)]).toString('base64');
     if(Buffer.byteLength(JSON.stringify(pack))>maxBytes)fail('LEGACY_EXPORT_TOO_LARGE');return validateArchive(pack);
   }
-  commit({baseRevision,notebookId,pageNumber,author,pageValue,expires=()=>false}){
+  createNotebook(series,book){
+    const root=this.getMeta('root'),before=encode(root),id=randomUUID();root.lib.series.push(series);this.setMeta('root',root);
+    const data=encode(book);this.statement('INSERT INTO notebooks VALUES(?,?,?,?,?)').run(book.id,this.statement('SELECT COALESCE(MAX(position)+1,0) AS n FROM notebooks').get().n,data.data,data.bytes,0);
+    this.statement('INSERT INTO history VALUES(?,?,?,?,?,?,?,?)').run(id,this.revision,book.id,null,'creation',before.data,before.bytes,null);this.indexTitle(book.id);return {checkpointId:id};
+  }
+  commit({baseRevision,notebookId,pageNumber,author,metadata,pageValue,expires=()=>false,advanceRevision=true}){
     return this.db.transaction(()=>{
       if(this.revision!==baseRevision)fail('REVISION_CONFLICT');if(expires())fail('SESSION_CLOSED');
-      const id=randomUUID(),kind=author===undefined?'page':'author';
+      const id=randomUUID(),kind=author===undefined&&metadata===undefined?'page':'author';
       const old=kind==='page'?this.statement('SELECT data,bytes FROM pages WHERE notebook=? AND number=?').get(notebookId,pageNumber):this.statement('SELECT metadata AS data,bytes FROM notebooks WHERE id=?').get(notebookId);
       const beforeLength=this.statement('SELECT pages_length FROM notebooks WHERE id=?').get(notebookId)?.pages_length;
       this.statement('INSERT INTO history VALUES(?,?,?,?,?,?,?,?)').run(id,baseRevision,notebookId,pageNumber??null,kind,old?.data||null,old?.bytes||null,beforeLength??null);
@@ -163,14 +168,14 @@ export class LargeArchiveStore{
         const value=encode(pageValue);this.statement('INSERT INTO pages VALUES(?,?,?,?) ON CONFLICT(notebook,number) DO UPDATE SET data=excluded.data,bytes=excluded.bytes').run(notebookId,pageNumber,value.data,value.bytes);
         this.statement('UPDATE notebooks SET pages_length=MAX(pages_length,?) WHERE id=?').run(pageNumber+1,notebookId);this.indexPage(notebookId,pageNumber);
       }else{
-        const book=this.book(notebookId);book.author=author;const value=encode(book);this.statement('UPDATE notebooks SET metadata=?,bytes=? WHERE id=?').run(value.data,value.bytes,notebookId);this.indexTitle(notebookId);
+        const book=this.book(notebookId);Object.assign(book,metadata||{author});const value=encode(book);this.statement('UPDATE notebooks SET metadata=?,bytes=? WHERE id=?').run(value.data,value.bytes,notebookId);this.indexTitle(notebookId);
       }
-      if(expires())fail('SESSION_CLOSED');this.setMeta('revision',baseRevision+1);
+      if(expires())fail('SESSION_CLOSED');if(advanceRevision)this.setMeta('revision',baseRevision+1);
       return {revision:baseRevision+1,checkpointId:id};
     }).immediate();
   }
   restoreChange(id,{baseRevision=this.revision}={}){
-    const change=this.statement('SELECT * FROM history WHERE id=?').get(id);if(!change)fail('NOT_FOUND');
+    const change=this.statement('SELECT * FROM history WHERE id=?').get(id);if(!change)fail('NOT_FOUND');if(change.kind==='creation')fail('MANUAL_RECOVERY_REQUIRED');
     return this.db.transaction(()=>{
       if(this.revision!==baseRevision)fail('REVISION_CONFLICT');
       const current=change.kind==='page'?this.statement('SELECT data,bytes FROM pages WHERE notebook=? AND number=?').get(change.notebook,change.page):this.statement('SELECT metadata AS data,bytes FROM notebooks WHERE id=?').get(change.notebook);

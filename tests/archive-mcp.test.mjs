@@ -22,7 +22,7 @@ async function connect(){
 async function call(name,args={}){const result=await client.callTool({name,arguments:args});const value=JSON.parse(result.content[0].text);transcript.push({name,arguments:args,result:value});return value;}
 async function until(phase){for(let i=0;i<100;i++){const state=await call('get_archive_status');if(state.state===phase)return state;await new Promise(resolve=>setTimeout(resolve,20));}throw Error('STATE_TIMEOUT');}
 try{
-  client=await connect();check('fourteen archive tools exposed by the actual SDK',(await client.listTools()).tools.length===14);
+  client=await connect();check('fourteen archive tools exposed by the actual SDK',(await client.listTools()).tools.length===17);
   const schemas=(await client.listTools()).tools;check('no password or filesystem path accepted by open tool',Object.keys(schemas.find(t=>t.name==='open_archive').inputSchema.properties).length===0);
   check('archive initially closed',(await call('get_archive_status')).state==='closed');
   check('closed archive cannot be read',(await call('list_notebooks')).error==='ARCHIVE_LOCKED');

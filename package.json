@@ -1,7 +1,7 @@
 {
   "name": "certosa-mcp",
-  "version": "0.0.4-alpha.1",
-  "description": "Local MCP engine for encrypted Certosa archives: incremental storage, author, scoped search/read/write and local unlock.",
+  "version": "0.0.5-alpha.1",
+  "description": "Recognise, locally unlock, atomically edit and validate encrypted Certosa notebooks; export through the original app reader.",
   "type": "module",
   "license": "MIT",
   "exports": {
@@ -21,7 +21,12 @@
     "README.it.md",
     "DISTRIBUTION.md",
     "CHANGELOG.md",
-    "LIVE-LAB.md"
+    "LIVE-LAB.md",
+    "skills/",
+    "INSTALL.md",
+    "tools/build-desktop.py",
+    "assets/certosa.png",
+    "INSTALL.it.md"
   ],
   "scripts": {
     "test": "node --test tests/*.test.mjs"
@@ -46,6 +51,8 @@
     "certosa-mcp": "src/archive-mcp-server.mjs",
     "certosa-mcp-lab": "src/lab-setup.mjs",
     "certosa-archive-setup": "src/archive-setup.mjs",
-    "certosa-browser-lab": "src/mcp-server.mjs"
+    "certosa-browser-lab": "src/mcp-server.mjs",
+    "certosa-desktop": "src/desktop-entry.mjs",
+    "certosa-client-config": "src/desktop-config.mjs"
   }
 }

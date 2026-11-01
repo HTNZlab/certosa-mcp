@@ -1,6 +1,7 @@
 import path from 'node:path';
 import {isEncrypted,archiveError} from './archive-format.mjs';
 import {ArchiveRouter} from './archive-router.mjs';
+import {archiveCapabilities} from './archive-guidance.mjs';
 
 export class ArchiveController{
   constructor({project,runtime,ui,engine}){
@@ -47,7 +48,7 @@ export class ArchiveController{
       this.report();
       const grant=await this.ui.ask('grant',{notebooks:notebooks.filter(n=>!n.reserved)});active();
       if(grant.cancelled)throw archiveError('CANCELLED');
-      this.engine.grant({notebookIds:grant.notebookIds,write:grant.write===true});this.phase='ready';
+      this.engine.grant({notebookIds:grant.notebookIds,write:grant.write===true,allowCreate:grant.allowCreate===true});this.phase='ready';
     }catch(e){
       if(this.generation===generation){
         this.engine.close();this.phase='closed';this.lastError=e.code==='CANCELLED'?null:e.code||'OPEN_FAILED';
@@ -75,6 +76,7 @@ export class ArchiveController{
   }
   close(){++this.generation;this.ui.cancel();this.engine.close();this.opening=false;this.exporting=false;this.phase='closed';this.lastError=null;this.lastExport=null;return {state:'closed'};}
   async call(name,args){
+    if(name==='get_archive_capabilities')return archiveCapabilities;
     if(name==='open_archive')return this.open();
     if(name==='import_archive')return this.open('import');
     if(name==='export_archive')return this.export();

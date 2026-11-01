@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.0.5-alpha.1 — 2026-11-01
+
+- Archive recognition instructions, prompts/resources and a distributable skill.
+- Atomic reviewed batches for notebook creation, page edits and author/font/capacity.
+- Separate native creation grant; transaction rollback preserves all records/index/history.
+- Validation includes media references/checksums and the original app's import planner.
+- Compatible exports are reopened with original Certosa Zip/Copia and compared before publication.
+- Claude MCPB and portable Windows bundle, dependencies included, client configuration generator.
+- 81 regressions; original archives retained, no directory/account acceptance claimed.
+
+
 ## 0.0.4-alpha.1 — 2026-11-01
 
 - Separate encrypted incremental `.certosa-db` backend with compressed pages,
