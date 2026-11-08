@@ -1,4 +1,4 @@
-import {createLocalNotebookTools} from './notebook-tools.mjs';
+import {createLocalNotebookTools,assertPlainReplaceSafe} from './notebook-tools.mjs';
 import {createLocalSecretCapabilities} from './secret-capabilities.mjs';
 // This module is loaded only by the dedicated loopback lab, never by the public PWA.
 const fragment=new URLSearchParams(location.hash.slice(1));
@@ -6,9 +6,10 @@ let pairing=fragment.get('certosa-pair');
 try{pairing||=sessionStorage.getItem('certosa-lab-pair');if(pairing)sessionStorage.setItem('certosa-lab-pair',pairing);}catch{}
 if(pairing)history.replaceState(null,'',location.pathname);
 let config,lease,session,secretSession,closed=true,writing=false,archiveReference;
-let connectedUntil=0,generation=0;
+let generation=0;
 let lastEdit=null;
 const knownErrors=new Set(['REVISION_CONFLICT','ARCHIVE_BUSY','ARCHIVE_LOCKED','ARCHIVE_CHANGED','SESSION_CLOSED','NOT_FOUND','FORBIDDEN','HANDLE_SPENT','NOT_AVAILABLE','CONTEXT_CHANGED','VAULT_LOCKED','SAVE_FAILED','INVALID_EDIT','DEVICE_UNAVAILABLE','OUTCOME_UNKNOWN_DO_NOT_RETRY']);
+knownErrors.add('RICH_TEXT_REQUIRES_PARAGRAPH_EDIT');
 const error=code=>{throw Object.assign(Error(code),{code});};
 async function request(route,data,signal){
   const response=await fetch(route,{method:data===undefined?'GET':'POST',headers:{Authorization:'Bearer '+pairing,'X-Certosa-Session':lease||'','Content-Type':'application/json'},
@@ -33,7 +34,7 @@ document.addEventListener('keydown',event=>{if(writing){event.preventDefault();e
 document.addEventListener('beforeinput',event=>{if(writing){event.preventDefault();event.stopImmediatePropagation();}},true);
 const consumed=new Set();
 async function apply({proposalId}){
-  const proposal=session.read_proposal({proposalId});
+  const ownSession=session,ownGeneration=generation,proposal=ownSession.raw.read_proposal({proposalId});
   if(consumed.has(proposalId))error('HANDLE_SPENT');
   if(proposal.stale)error('REVISION_CONFLICT');
   if(proposal.operations.length!==1||proposal.operations[0].type!=='edit_page')error('INVALID_EDIT');
@@ -43,6 +44,7 @@ async function apply({proposalId}){
   if(!nb||nb.sensitivity==='secret'||BuiltinManual.is(nb))error('FORBIDDEN');
   const pg=page(nb,operation.pageNumber);
   if(JsonExport.content(pg.html||'').text!==operation.beforeText)error('REVISION_CONFLICT');
+  if(operation.mode==='replace')assertPlainReplaceSafe(pg.html||'');
   if(operation.mode==='append')pg.html=(pg.html||'')+htmlText(operation.afterText.slice(operation.beforeText.length));
   else pg.html=htmlText(operation.afterText);
   if(operation.source)pg.connectorSource=operation.source;
@@ -51,6 +53,7 @@ async function apply({proposalId}){
   consumed.add(proposalId);blockEditing(true);
   try{
     if(!await Store.istantanea('mcp-'+Date.now()))error('SAVE_FAILED');
+    ownSession.checkConsent();if(closed||session!==ownSession||generation!==ownGeneration)error('SESSION_CLOSED');
     if(locked()||lib!==archiveReference||Store.revision!==proposal.baseRevision)error('REVISION_CONFLICT');
     if(!await Store.save(candidate))error('SAVE_FAILED');
     // Store.save uses the existing AES-GCM envelope and atomic revision check.
@@ -138,24 +141,25 @@ async function revoke(){
 async function poll(ownGeneration){
   while(!closed&&ownGeneration===generation){
     try{
-      if(locked()||lib!==archiveReference||Date.now()>=connectedUntil){await revoke();break;}
+      if(locked()||lib!==archiveReference){await revoke();break;}session.checkConsent();
       const {job}=await request('/bridge/poll');
       if(ownGeneration!==generation)break;
       if(job){
         let result;
         try{
           if(job.expiresAt<=Date.now())error('SESSION_CLOSED');
-          await settle();
-          if(closed)error('SESSION_CLOSED');
-          if(job.expiresAt<=Date.now())error('SESSION_CLOSED');
-          if(job.name==='apply_proposal')result=await apply(job.arguments);
-          else if(['prepare_credential_use','use_credential'].includes(job.name)){
+          if(['prepare_credential_use','use_credential'].includes(job.name)){
+            await settle();if(closed||job.expiresAt<=Date.now())error('SESSION_CLOSED');
             if(!secretSession)error('NOT_AVAILABLE');result=await secretSession[job.name](job.arguments);
             if(job.name==='use_credential'){
               status.dataset.credentialState='used';
               status.textContent=result.status==='completed'?'Accesso di prova riuscito. La credenziale è stata usata senza mostrarne il valore.':'Uso della credenziale non completato. Prepara un altro uso prima di riprovare.';
             }
-          }else result=await session[job.name](job.arguments);
+          }else result=await session.runUse(async()=>{
+            await settle();if(closed||job.expiresAt<=Date.now())error('SESSION_CLOSED');
+            if(job.name==='apply_proposal')return apply(job.arguments);
+            if(typeof session.raw[job.name]!=='function')error('INVALID_EDIT');return session.raw[job.name](job.arguments);
+          });
         }catch(e){result={error:knownErrors.has(e.code)?e.code:'OPERATION_FAILED'};}
         await request('/bridge/result',{id:job.id,result});
       }
@@ -171,20 +175,20 @@ async function connect(){
   session?.close();secretSession?.close();secretSession=null;consumed.clear();lastEdit=null;archiveReference=lib;
   const owner=createLocalNotebookTools({readState,plainText:html=>JsonExport.content(html).text,isSystemNotebook:nb=>BuiltinManual.is(nb),
     searchEntries:(entries,query)=>{const parsed=CertosaSearchEngine.parse(query);if(parsed.error)error('INVALID_EDIT');return CertosaSearchEngine.scan(entries,parsed);}});
-  session=owner.openSession({archiveId:config.libraryId,notebookIds:[config.notebookId],permissions:['read','search','propose_edit'],ttlMs:900000});
-  ({lease}=await request('/bridge/connect',{}));closed=false;connectedUntil=Date.now()+900000;generation++;
-  status.textContent='Collegato per 15 minuti: lettura, ricerca e modifiche a Usi Interessanti. Revocabile qui.';
+  session=owner.openSession({archiveId:config.libraryId,notebookIds:[config.notebookId],permissions:['read','search','propose_edit']});
+  ({lease}=await request('/bridge/connect',{}));closed=false;generation++;
+  status.textContent='Collegato: 30 minuti di inattività, rinnovati dall’uso riuscito. Lettura, ricerca e modifiche a Usi Interessanti. Revocabile qui.';
   status.dataset.credentialState='unavailable';
   void poll(generation);
 }
 const dialog=document.createElement('dialog');dialog.id='certosaConnectorDialog';
 dialog.style.cssText='max-width:440px;width:calc(100% - 36px);padding:18px;background:#fcf9ee;color:#252525;border:1px solid #8b7046;border-radius:8px;font:15px system-ui;line-height:1.4';
-dialog.innerHTML='<h2 style="font-size:18px;margin:0 0 10px">Chat · biblioteca di prova</h2><p>Autorizzi soltanto il quaderno Usi Interessanti. Le modifiche sono salvate sul dispositivo con una copia precedente. Gli estratti richiesti saranno leggibili dalla chat.</p><p id="certosaConnectionStatus" role="status">Non collegato.</p><div style="display:flex;flex-wrap:wrap;gap:8px"><button id="certosaConnect">Collega per 15 minuti</button><button id="certosaRevoke">Revoca</button><button id="certosaUndo">Annulla ultima modifica chat</button><button id="certosaFixture">Crea credenziale fittizia</button><button id="certosaDialogClose">Chiudi</button></div>';
+dialog.innerHTML='<h2 style="font-size:18px;margin:0 0 10px">Chat · biblioteca di prova</h2><p>Autorizzi soltanto il quaderno Usi Interessanti. Le modifiche sono salvate sul dispositivo con una copia precedente. Gli estratti richiesti saranno leggibili dalla chat.</p><p id="certosaConnectionStatus" role="status">Non collegato.</p><div style="display:flex;flex-wrap:wrap;gap:8px"><button id="certosaConnect">Collega · 30 min inattivi</button><button id="certosaRevoke">Revoca</button><button id="certosaUndo">Annulla ultima modifica chat</button><button id="certosaFixture">Crea credenziale fittizia</button><button id="certosaDialogClose">Chiudi</button></div>';
 dialog.querySelectorAll('button').forEach(b=>b.style.cssText='min-height:36px;padding:6px 9px;font:14px system-ui;cursor:pointer');
 const status=dialog.querySelector('#certosaConnectionStatus');
 let uiPending=false;
 const messages={
-  SESSION_CLOSED:'Prima premi «Collega per 15 minuti», poi «Crea credenziale fittizia». La sessione può essere scaduta o revocata.',
+  SESSION_CLOSED:'Prima premi «Collega · 30 min inattivi», poi «Crea credenziale fittizia». La sessione può essere scaduta o revocata.',
   ARCHIVE_LOCKED:'Completa l’ingresso nella biblioteca protetta con la tua password locale, poi riprova.',
   ARCHIVE_BUSY:'È in corso un salvataggio o un’altra operazione. Attendi il completamento e riprova.',
   SAVE_FAILED:'Salvataggio non riuscito: la credenziale non è pronta. I quaderni precedenti sono conservati.',

@@ -7,7 +7,7 @@ const args=new Map();for(let i=2;i<process.argv.length;i+=2)args.set(process.arg
 if(!args.get('--project')||!path.isAbsolute(args.get('--project')))throw Error('ABSOLUTE_ARCHIVE_PROJECT_REQUIRED');
 const project=fs.realpathSync(args.get('--project')),out=projectDirectory(project,args.get('--out')||path.join(project,'certosa-client-configs'));
 const entry=fileURLToPath(new URL('./desktop-entry.mjs',import.meta.url));
-const runtime=projectDirectory(project,path.join(project,'.certosa-connectors','0.0.5-alpha.1'));
+const runtime=projectDirectory(project,path.join(project,'.certosa-connectors','0.0.6-alpha.3'));
 for(const name of ['.tmp','cache-node'])projectDirectory(project,path.join(runtime,name));
 const env={TEMP:path.join(runtime,'.tmp'),TMP:path.join(runtime,'.tmp'),TMPDIR:path.join(runtime,'.tmp'),NODE_DISABLE_COMPILE_CACHE:'1'};
 const server={command:process.execPath,args:[entry,project],env};

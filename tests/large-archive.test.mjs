@@ -12,7 +12,7 @@ import {ArchiveRouter} from '../src/archive-router.mjs';
 import {unlockArchiveBytes} from '../src/archive-format.mjs';
 import {fixture,packFixture,project,native} from './archive-fixtures.mjs';
 
-const root=path.join(project,'verifiche/large-archive-20261101','unit-'+Date.now());fs.mkdirSync(root,{recursive:true});let serial=0;
+const root=path.join(process.env.CERTOSA_TEST_OUTPUT_ROOT||path.join(project,'verifiche/large-archive-20261101'),'unit-'+Date.now());fs.mkdirSync(root,{recursive:true});let serial=0;
 function setup(){const folder=path.join(root,String(++serial));fs.mkdirSync(folder);const password=randomBytes(24).toString('hex'),pack=packFixture();pack.lib.notebooks[0].author='Autore di prova';pack.lib.notebooks[0].foreignEdition={keep:'original'};const file=path.join(folder,'sample.certosa-db');return {folder,password,pack,file,store:LargeArchiveStore.create(file,password,pack)};}
 const errorCode=(fn,code)=>assert.throws(fn,e=>e.code===code);
 const rejected=(fn,code)=>assert.rejects(fn,e=>e.code===code);

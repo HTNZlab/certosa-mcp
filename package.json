@@ -1,7 +1,7 @@
 {
   "name": "certosa-mcp",
-  "version": "0.0.5-alpha.1",
-  "description": "Recognise, locally unlock, atomically edit and validate encrypted Certosa notebooks; export through the original app reader.",
+  "version": "0.0.6-alpha.3",
+  "description": "Encrypted Certosa archives, 30-minute idle consent and reviewed text edits preserving formatting and media.",
   "type": "module",
   "license": "MIT",
   "exports": {
@@ -28,9 +28,6 @@
     "assets/certosa.png",
     "INSTALL.it.md"
   ],
-  "scripts": {
-    "test": "node --test tests/*.test.mjs"
-  },
   "engines": {
     "node": ">=22.13"
   },
@@ -54,5 +51,9 @@
     "certosa-browser-lab": "src/mcp-server.mjs",
     "certosa-desktop": "src/desktop-entry.mjs",
     "certosa-client-config": "src/desktop-config.mjs"
+  },
+  "homepage": "https://certosa.htnzlab.it/",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs"
   }
 }

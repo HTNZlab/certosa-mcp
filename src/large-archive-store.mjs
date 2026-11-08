@@ -7,7 +7,7 @@ import {randomUUID,createHash} from 'node:crypto';
 import {gzipSync,gunzipSync} from 'node:zlib';
 import {archiveError,validateArchive,MAX_JSON_BYTES} from './archive-format.mjs';
 import {projectDirectory} from './archive-paths.mjs';
-import {plainText} from './archive-text.mjs';
+import {plainText,SEARCH_TEXT_VERSION} from './archive-text.mjs';
 
 export const MEDIA_CHUNK_BYTES=3*1024*1024;
 const fail=code=>{throw archiveError(code);};
@@ -35,6 +35,7 @@ export class LargeArchiveStore{
     this.db=db;this.filename=filename;this.statements=new Map();
     const format=this.getMeta('format');if(format?.version!==1||format?.kind!=='certosa-incremental'||!building&&this.getMeta('complete')!==true)fail('INVALID_ARCHIVE');
     this.archiveId=format.id;
+    if(!building)this.ensureSearchIndex();
   }
   static open(filename,password){
     const db=connection(filename,password);try{return new LargeArchiveStore(db,filename);}catch(e){db.close();throw e;}
@@ -76,7 +77,7 @@ export class LargeArchiveStore{
         function* input(){for(let start=0;start<base64.length;start+=4*1024*1024)yield Buffer.from(base64.slice(start,start+4*1024*1024),'base64');}
         const added=store.putAttachment(input(),{prefix:data.slice(0,comma+1)});if(added.hash!==hash.toLowerCase())fail('INVALID_ATTACHMENT');
       }
-      db.transaction(()=>{for(const row of db.prepare('SELECT id FROM notebooks ORDER BY position').all()){store.indexTitle(row.id);for(const page of db.prepare('SELECT number FROM pages WHERE notebook=? ORDER BY number').all(row.id))store.indexPage(row.id,page.number);}store.setMeta('complete',true);}).immediate();
+      db.transaction(()=>{store.ensureSearchIndex();store.setMeta('complete',true);}).immediate();
       store.close();fs.linkSync(staging,filename);fs.unlinkSync(staging);
       return LargeArchiveStore.open(filename,password);
     }catch(e){if(db.open)db.close();throw e;}
@@ -85,6 +86,23 @@ export class LargeArchiveStore{
   getMeta(key){const row=this.statement('SELECT data FROM meta WHERE key=?').get(key);return row?decode(row.data):undefined;}
   setMeta(key,value){const data=encode(value);this.statement('INSERT INTO meta VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET data=excluded.data,bytes=excluded.bytes').run(key,data.data,data.bytes);}
   get revision(){return this.getMeta('revision');}
+  markSearchIndex(){this.setMeta('searchIndex',{textVersion:SEARCH_TEXT_VERSION,revision:this.revision});}
+  advanceRevision(revision){this.setMeta('revision',revision);this.markSearchIndex();}
+  ensureSearchIndex(){
+    const current=()=>{const marker=this.getMeta('searchIndex');return marker?.textVersion===SEARCH_TEXT_VERSION&&marker.revision===this.revision;};
+    if(current())return false;
+    // Rebuild only derived text/FTS, including detection of writes by an older
+    // client that advances the archive revision without updating this marker.
+    return this.db.transaction(()=>{
+      if(current())return false;
+      this.statement('DELETE FROM documents').run();
+      for(const row of this.statement('SELECT id FROM notebooks ORDER BY position').all()){
+        this.indexTitle(row.id);
+        for(const page of this.statement('SELECT number FROM pages WHERE notebook=? ORDER BY number').all(row.id))this.indexPage(row.id,page.number);
+      }
+      this.markSearchIndex();return true;
+    }).immediate();
+  }
   books(){return this.statement('SELECT id,metadata FROM notebooks ORDER BY position').all().map(row=>decode(row.metadata));}
   book(id){const row=this.statement('SELECT metadata FROM notebooks WHERE id=?').get(id);return row?decode(row.metadata):null;}
   page(id,number){const row=this.statement('SELECT data FROM pages WHERE notebook=? AND number=?').get(id,number);return row?decode(row.data):null;}
@@ -160,6 +178,7 @@ export class LargeArchiveStore{
   commit({baseRevision,notebookId,pageNumber,author,metadata,pageValue,expires=()=>false,advanceRevision=true}){
     return this.db.transaction(()=>{
       if(this.revision!==baseRevision)fail('REVISION_CONFLICT');if(expires())fail('SESSION_CLOSED');
+      this.ensureSearchIndex();
       const id=randomUUID(),kind=author===undefined&&metadata===undefined?'page':'author';
       const old=kind==='page'?this.statement('SELECT data,bytes FROM pages WHERE notebook=? AND number=?').get(notebookId,pageNumber):this.statement('SELECT metadata AS data,bytes FROM notebooks WHERE id=?').get(notebookId);
       const beforeLength=this.statement('SELECT pages_length FROM notebooks WHERE id=?').get(notebookId)?.pages_length;
@@ -170,7 +189,7 @@ export class LargeArchiveStore{
       }else{
         const book=this.book(notebookId);Object.assign(book,metadata||{author});const value=encode(book);this.statement('UPDATE notebooks SET metadata=?,bytes=? WHERE id=?').run(value.data,value.bytes,notebookId);this.indexTitle(notebookId);
       }
-      if(expires())fail('SESSION_CLOSED');if(advanceRevision)this.setMeta('revision',baseRevision+1);
+      if(expires())fail('SESSION_CLOSED');if(advanceRevision)this.advanceRevision(baseRevision+1);
       return {revision:baseRevision+1,checkpointId:id};
     }).immediate();
   }
@@ -178,6 +197,7 @@ export class LargeArchiveStore{
     const change=this.statement('SELECT * FROM history WHERE id=?').get(id);if(!change)fail('NOT_FOUND');if(change.kind==='creation')fail('MANUAL_RECOVERY_REQUIRED');
     return this.db.transaction(()=>{
       if(this.revision!==baseRevision)fail('REVISION_CONFLICT');
+      this.ensureSearchIndex();
       const current=change.kind==='page'?this.statement('SELECT data,bytes FROM pages WHERE notebook=? AND number=?').get(change.notebook,change.page):this.statement('SELECT metadata AS data,bytes FROM notebooks WHERE id=?').get(change.notebook);
       const currentLength=this.statement('SELECT pages_length FROM notebooks WHERE id=?').get(change.notebook).pages_length,checkpointId=randomUUID();
       this.statement('INSERT INTO history VALUES(?,?,?,?,?,?,?,?)').run(checkpointId,baseRevision,change.notebook,change.page,change.kind,current?.data||null,current?.bytes||null,currentLength);
@@ -188,7 +208,7 @@ export class LargeArchiveStore{
         this.statement('UPDATE notebooks SET pages_length=? WHERE id=?').run(Math.max(change.before_length||0,last),change.notebook);
         this.indexPage(change.notebook,change.page);
       }else{this.statement('UPDATE notebooks SET metadata=?,bytes=? WHERE id=?').run(change.before_data,change.before_bytes,change.notebook);this.indexTitle(change.notebook);}
-      this.setMeta('revision',baseRevision+1);return {revision:baseRevision+1,checkpointId,restoredFrom:id};
+      this.advanceRevision(baseRevision+1);return {revision:baseRevision+1,checkpointId,restoredFrom:id};
     }).immediate();
   }
   stats(){return {chunks:this.statement('SELECT COUNT(*) AS n FROM chunks').get().n,mediaBytes:this.statement('SELECT COALESCE(SUM(bytes),0) AS n FROM attachments').get().n,history:this.statement('SELECT COUNT(*) AS n FROM history').get().n,pages:this.statement('SELECT COUNT(*) AS n FROM pages').get().n};}

@@ -6,6 +6,37 @@ const SCOPES = new Set(['read', 'search', 'propose_create', 'propose_edit']);
 const clone = value => structuredClone(value);
 const fail = code => { throw Object.assign(new Error(code), {code}); };
 const integer = (n, min, max) => Number.isSafeInteger(n) && n >= min && n <= max;
+export const DEFAULT_IDLE_TTL_MS=30*60*1000;
+// Only successful authorised entrypoints renew. An admitted operation may finish
+// after the idle deadline; new calls may not start then. Revocation always wins.
+export function createIdleConsent({ttlMs=DEFAULT_IDLE_TTL_MS,now=()=>Date.now(),onExpire=()=>{}}={}){
+  if(!integer(ttlMs,1,DEFAULT_IDLE_TTL_MS))fail('INVALID_GRANT');
+  let closed=false;const active=new Set();
+  const consent={ttlMs,expiresAt:now()+ttlMs,
+    get activeOperations(){return active.size;},get closed(){return closed;},
+    close(){closed=true;active.clear();},
+    check(){if(closed)fail('SESSION_CLOSED');if(!active.size&&now()>=consent.expiresAt){consent.close();onExpire();fail('SESSION_CLOSED');}},
+    run(operation){
+      if(closed)fail('SESSION_CLOSED');
+      if(now()>=consent.expiresAt){if(!active.size){consent.close();onExpire();}fail('SESSION_CLOSED');}
+      const token={};active.add(token);
+      const finish=(ok,value)=>{
+        if(closed||!active.has(token))fail('SESSION_CLOSED');
+        if(ok)consent.expiresAt=now()+ttlMs;
+        active.delete(token);
+        if(!ok&&!active.size&&now()>=consent.expiresAt){consent.close();onExpire();}
+        return ok&&value&&typeof value==='object'&&Object.hasOwn(value,'expiresAt')?{...value,expiresAt:consent.expiresAt}:value;
+      };
+      try{const value=operation();if(value&&typeof value.then==='function')return Promise.resolve(value).then(v=>finish(true,v),e=>{try{finish(false);}catch{}throw e;});return finish(true,value);}
+      catch(e){try{finish(false);}catch{}throw e;}
+    }
+  };return consent;
+}
+// Conservative legacy guard shared by browser and file engines. Rich pages must
+// use structured paragraph edits; a plain replacement may never flatten them.
+export function assertPlainReplaceSafe(html){
+  if(String(html||'').replace(/<\/?div(?:\s+class=(?:"p"|'p'))?\s*>|<br\s*\/?\s*>/gi,'').includes('<'))fail('RICH_TEXT_REQUIRES_PARAGRAPH_EDIT');
+}
 function text(value, max, empty = false) {
   if (typeof value !== 'string' || value.length > max || (!empty && !value.trim())) fail('INVALID_TEXT');
   return value;
@@ -17,18 +48,20 @@ export function createLocalNotebookTools({readState, plainText, searchEntries, i
   for (const fn of [readState, plainText, searchEntries, isSystemNotebook]) if (typeof fn !== 'function') fail('MISSING_OWNER_ADAPTER');
 
   // Called only by the trusted local owner, never from remotely supplied arguments.
-  function openSession({archiveId, notebookIds = [], permissions = [], ttlMs = 900000}) {
+  function openSession({archiveId, notebookIds = [], permissions = [], ttlMs = DEFAULT_IDLE_TTL_MS, idleConsent}) {
     text(archiveId, 128);
-    if (!Array.isArray(notebookIds) || !Array.isArray(permissions) || permissions.some(s => !SCOPES.has(s)) || !integer(ttlMs, 1, 3600000)) fail('INVALID_GRANT');
+    if (!Array.isArray(notebookIds) || !Array.isArray(permissions) || permissions.some(s => !SCOPES.has(s)) || !integer(ttlMs, 1, DEFAULT_IDLE_TTL_MS)) fail('INVALID_GRANT');
     const allowed = new Set(notebookIds.map(id => text(id, 128)));
-    const granted = new Set(permissions), expiresAt = now() + ttlMs, proposals = new Map();
+    const granted = new Set(permissions), proposals = new Map();
+    const consent=idleConsent||createIdleConsent({ttlMs,now,onExpire:()=>close()});
     let closed = false;
-    function close() { closed = true; proposals.clear(); }
+    function close() { closed = true; proposals.clear(); consent.close(); }
     function state(scope) {
-      if (closed || now() >= expiresAt) { close(); fail('SESSION_CLOSED'); }
+      consent.check();if (closed)fail('SESSION_CLOSED');
       if (!granted.has(scope)) fail('FORBIDDEN');
       const current = readState();
       if (!current || current.locked) { close(); fail('ARCHIVE_LOCKED'); }
+      if(current.lib?._pageStore)fail('INVALID_OWNER_SNAPSHOT'); // browser refs need the async owner adapter/export
       const s = {...current}; // capture revision even when the owner reuses its state object
       if (s.archiveId !== archiveId) { close(); fail('ARCHIVE_CHANGED'); }
       if (s.busy) fail('ARCHIVE_BUSY');
@@ -39,14 +72,14 @@ export function createLocalNotebookTools({readState, plainText, searchEntries, i
     function find(s, id) { const nb = eligible(s).find(n => n.id === id); if (!nb) fail('NOT_FOUND'); return nb; }
     const title = (s, nb) => s.lib.series.find(series => series.id === nb.sid)?.label || '';
     const author = (s,nb) => String(typeof nb.author==='string'?nb.author:typeof s.lib.series.find(x=>x.id===nb.sid)?.author==='string'?s.lib.series.find(x=>x.id===nb.sid).author:'').slice(0,500);
-    const metadata = (s, nb) => ({archiveId, notebookId: nb.id, seriesId: nb.sid, title: title(s, nb), author:author(s,nb), volume: nb.vol, pageCapacity: nb.maxPages, revision: s.revision});
+    const metadata = (s, nb) => ({archiveId, notebookId: nb.id, seriesId: nb.sid, title: title(s, nb), author:author(s,nb), volume: nb.vol, pageCapacity: nb.maxPages, pagination:['continuous','fixed'].includes(nb.pagination)?nb.pagination:'independent', revision: s.revision});
     const source = value => value == null ? undefined : {
       kind: ['chat', 'manual', 'note', 'other'].includes(value.kind) ? value.kind : 'other',
       reference: text(value.reference, 1000),
     };
     function saveProposal(s, scope, operations) {
       if (proposals.size >= 20) fail('TOO_MANY_PROPOSALS');
-      const proposal = {id: newId(), archiveId, baseRevision: s.revision, scope, expiresAt,
+      const proposal = {id: newId(), archiveId, baseRevision: s.revision, scope, expiresAt:consent.expiresAt,
         status: 'proposal_only', operations};
       proposals.set(proposal.id, clone(proposal));
       return clone(proposal);
@@ -136,6 +169,7 @@ export function createLocalNotebookTools({readState, plainText, searchEntries, i
       if (!integer(pageNumber, 1, nb.maxPages)) fail('INVALID_PAGE');
       if (!['append', 'replace'].includes(mode)) fail('INVALID_EDIT');
       text(value, 100000, true);
+      if(mode==='replace')assertPlainReplaceSafe(nb.pages[pageNumber]?.html||'');
       const before = plainText(nb.pages[pageNumber]?.html || '');
       return saveProposal(s, 'propose_edit', [{type: 'edit_page', notebookId, pageNumber, mode,
         beforeText: before, afterText: mode === 'append' ? before + value : value,
@@ -146,7 +180,7 @@ export function createLocalNotebookTools({readState, plainText, searchEntries, i
       const p = proposals.get(proposalId); if (!p) fail('NOT_FOUND');
       const s = state(p.scope);
       for (const operation of p.operations) if (operation.notebookId) find(s, operation.notebookId);
-      return {...clone(p), stale: s.revision !== p.baseRevision, currentRevision: s.revision};
+      return {...clone(p), expiresAt:consent.expiresAt, stale: s.revision !== p.baseRevision, currentRevision: s.revision};
     }
     function prepare_author_edit({notebookId,baseRevision,author:value}){
       const s=state('propose_edit'),nb=find(s,notebookId);
@@ -157,8 +191,9 @@ export function createLocalNotebookTools({readState, plainText, searchEntries, i
     // Trusted owner adapter only: never a transport tool. Extends the existing
     // session after an explicitly authorised creation without resetting expiry.
     function authoriseCreatedNotebook(id){state('propose_edit');allowed.add(text(id,128));}
-    const api={list_notebooks, read_notebook, search_notebooks, prepare_collection, prepare_edit, prepare_author_edit, read_proposal, close};
-    Object.defineProperty(api,'authoriseCreatedNotebook',{value:authoriseCreatedNotebook});return Object.freeze(api);
+    const raw={list_notebooks, read_notebook, search_notebooks, prepare_collection, prepare_edit, prepare_author_edit, read_proposal};
+    const api=Object.fromEntries(Object.entries(raw).map(([name,fn])=>[name,idleConsent?fn:(...args)=>consent.run(()=>fn(...args))]));api.close=close;
+    Object.defineProperties(api,{authoriseCreatedNotebook:{value:authoriseCreatedNotebook},raw:{value:Object.freeze(raw)},runUse:{value:fn=>consent.run(fn)},checkConsent:{value:()=>consent.check()},idleExpiresAt:{get:()=>consent.expiresAt},activeOperations:{get:()=>consent.activeOperations}});return Object.freeze(api);
   }
   return Object.freeze({openSession});
 }

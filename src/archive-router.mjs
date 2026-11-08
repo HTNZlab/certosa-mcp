@@ -11,9 +11,9 @@ import {validateCompatiblePack,verifyNativeExport} from './archive-validation.mj
 const fail=code=>{throw archiveError(code);};
 
 export class ArchiveRouter{
-  constructor({project,runtime}){
+  constructor({project,runtime,now=Date.now}){
     this.project=fs.realpathSync(project);this.runtime=runtime;this.io=fs;this.active=null;this.epoch=0;
-    this.legacy=new ArchiveEngine({project,backupDirectory:path.join(runtime,'backups')});this.large=new LargeArchiveEngine();this.workflow=new ArchiveWorkflow(this);
+    this.legacy=new ArchiveEngine({project,backupDirectory:path.join(runtime,'backups'),now});this.large=new LargeArchiveEngine({now});this.workflow=new ArchiveWorkflow(this);
   }
   inside(filename){return this.legacy.inside(filename);}
   isIncremental(filename){return path.extname(filename).toLowerCase()==='.certosa-db';}
@@ -47,6 +47,9 @@ export class ArchiveRouter{
     }finally{material.key.fill(0);}
   }
   async exportLegacy(filename,password){
+    if(!this.active)fail('ARCHIVE_LOCKED');return this.active.runUse(()=>this.exportLegacyUse(filename,password));
+  }
+  async exportLegacyUse(filename,password){
     const active=this.active,epoch=this.epoch;if(!active?.session)fail('ARCHIVE_LOCKED');
     active.check?.();active.readState?.();
     const parent=projectDirectory(this.project,path.dirname(path.resolve(filename))),target=path.join(parent,path.basename(filename));
@@ -66,13 +69,22 @@ export class ArchiveRouter{
     }finally{material.key.fill(0);if(temporary)try{fs.unlinkSync(temporary);}catch{}}
   }
   backup(filename){
+    if(this.active!==this.large)fail('INCREMENTAL_REQUIRED');return this.large.runUse(()=>this.backupUse(filename));
+  }
+  backupUse(filename){
     if(this.active!==this.large)fail('INCREMENTAL_REQUIRED');this.large.check();
     const epoch=this.epoch,parent=projectDirectory(this.project,path.dirname(path.resolve(filename))),target=path.join(parent,path.basename(filename));
     if(path.extname(target).toLowerCase()!=='.certosa-db')fail('INVALID_ARCHIVE');
-    return this.large.store.snapshot(target,{valid:()=>epoch===this.epoch&&!!this.large.session&&this.large.now()<this.large.session.expiresAt});
+    const consent=this.large.idleConsent;return this.large.store.snapshot(target,{valid:()=>epoch===this.epoch&&!!this.large.session&&this.large.idleConsent===consent&&!consent.closed});
   }
-  grant(args){if(!this.active)fail('ARCHIVE_LOCKED');const result=this.active.grant(args);this.active.allowCreate=args.write===true&&args.allowCreate===true;return result;}
+  grant(args){if(!this.active)fail('ARCHIVE_LOCKED');const result=this.active.grant(args);++this.epoch;this.workflow.close();this.active.allowCreate=args.write===true&&args.allowCreate===true;return result;}
   status(){return this.active?this.active.status():{state:'closed',notebookCount:0,writeAllowed:false};}
-  async call(name,args){if(!this.active)fail('ARCHIVE_LOCKED');if(name==='prepare_archive_edit')return this.workflow.prepare(args);if(name==='validate_archive')return this.workflow.validate();if(args?.proposalId?.startsWith('batch-')){if(name==='read_proposal')return this.workflow.proposal(args);if(name==='apply_proposal')return this.workflow.apply(args);}return this.active.call(name,args);}
+  async call(name,args){
+    if(!this.active)fail('ARCHIVE_LOCKED');
+    const methods={read_page_blocks:'readBlocks',prepare_paragraph_edit:'prepareParagraph',prepare_archive_edit:'prepare',validate_archive:'validate'};
+    if(Object.hasOwn(methods,name))return this.active.runUse(()=>this.workflow[methods[name]](args));
+    if(args?.proposalId?.startsWith('batch-')){if(name==='read_proposal')return this.active.runUse(()=>this.workflow.proposal(args));if(name==='apply_proposal')return this.active.runUse(()=>this.workflow.apply(args));}
+    return this.active.call(name,args);
+  }
   close(){++this.epoch;this.workflow?.close();this.legacy.close();this.large.close();this.active=null;}
 }

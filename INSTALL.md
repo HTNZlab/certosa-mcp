@@ -1,4 +1,4 @@
-# Install Certosa Archives · 0.0.5-alpha.1
+# Install Certosa Archives · 0.0.6-alpha.3
 
 [Italian instructions](INSTALL.it.md)
 
@@ -9,12 +9,29 @@ an MCP-capable host; this package does not change model weights.
 
 ## Download and verify
 
-Download from the [GitHub release](https://github.com/HTNZlab/certosa-mcp/releases/tag/v0.0.5-alpha.1)
-and compare SHA-256 with `SHA256SUMS`:
+Official release downloads:
+
+- [Windows MCPB](https://certosa.htnzlab.it/downloads/mcp/0.0.6-alpha.3/certosa-archives-0.0.6-alpha.3-windows.mcpb)
+- [Portable ZIP](https://certosa.htnzlab.it/downloads/mcp/0.0.6-alpha.3/certosa-archives-0.0.6-alpha.3-windows-portable.zip)
+- [Source ZIP](https://certosa.htnzlab.it/downloads/mcp/0.0.6-alpha.3/certosa-mcp-0.0.6-alpha.3-source.zip)
+- [SHA256SUMS](https://certosa.htnzlab.it/downloads/mcp/0.0.6-alpha.3/SHA256SUMS)
+
+Compare each downloaded file's SHA-256 with `SHA256SUMS`. Publishing these files
+does not install the connector in any client. GitHub release availability is
+not required for these official downloads:
 
 ```powershell
-Get-FileHash ./certosa-archives-0.0.5-alpha.1-windows.mcpb -Algorithm SHA256
+Get-FileHash ./certosa-archives-0.0.6-alpha.3-windows.mcpb -Algorithm SHA256
 ```
+
+Opening an older `.certosa-db` may rebuild its local search index to preserve
+paragraph boundaries. This updates derived search data only; pages, media,
+metadata, history and the content revision remain unchanged. It does not
+convert the archive format.
+
+Use the updated Certosa 0.3.8 build to restore PDF and WAV attachments. Export
+checks the MIME types supported by the app. Preserving attachments does not
+provide PDF text search, OCR or audio transcription.
 
 Windows x64 / Node 22.23.4 is tested. Node 22.13+ and Windows PowerShell / Windows
 Forms are required for local file selection, password and consent. Archives,
@@ -23,7 +40,7 @@ This project keeps all working data and caches on H.
 
 ## Claude Desktop on Windows
 
-Download `certosa-archives-0.0.5-alpha.1-windows.mcpb`. In Claude Desktop open
+Use `certosa-archives-0.0.6-alpha.3-windows.mcpb`. In Claude Desktop open
 Settings → Extensions → Advanced settings → Install Extension, select the file
 and follow the prompts. Choose an existing local archive working folder.
 Do not enter an archive password in extension settings.
@@ -36,7 +53,7 @@ a particular Claude account remains a separate check.
 
 ## ChatGPT desktop, Codex and local-model MCP hosts
 
-Extract `certosa-archives-0.0.5-alpha.1-windows-portable.zip` into a stable project
+Extract `certosa-archives-0.0.6-alpha.3-windows-portable.zip` into a stable project
 directory. Node 22.13+ is required. Dependencies are included; no global npm
 installation is needed. Create a working folder, then generate examples:
 
@@ -65,7 +82,7 @@ node <extracted-folder>/src/desktop-entry.mjs H:/ArchiveWorkspace
 ```
 
 Use the generated environment settings too. Runtime data go under
-`<working-folder>/.certosa-connectors/0.0.5-alpha.1`; there is no silent fallback
+`<working-folder>/.certosa-connectors/0.0.6-alpha.3`; there is no silent fallback
 to another disk. No Windows file association is registered. Recognition uses
 MCP instructions, descriptions, prompts and the included skill. Hosts that do
 not read instructions can use the skill or `certosa://archive-workflow` resource.
@@ -76,7 +93,11 @@ Ask: “Open a copy of my Certosa archive.” Choose it in the native Windows wi
 Enter the password **only there**, then authorise the notebooks you need. For
 new notebooks, enable “Consenti anche la creazione di nuovi quaderni”. Creation-only
 consent can be given without granting existing notebooks. Consent expires after
-15 minutes; renew locally without sending a password to the chat. Exported-file
+30 minutes of inactivity. Successful authorised operations restart that interval;
+status/capabilities polling and handshakes do not. An already running operation
+counts as activity and may finish, but explicit revocation still prevents commit.
+Failed operations do not renew consent. Expiry or revocation requires new local
+unlock and consent; never send the password to the chat. Exported-file
 passwords may differ from browser-library passwords.
 
 Example request:
@@ -85,13 +106,23 @@ Example request:
 > and table of contents. Update two pages of the authorised notebook too.
 > Show the proposal, apply it, read it back and save a compatible Certosa copy.
 
-The 17 tools include atomic batches of up to 100 operations / 200,000 new text
+The 19 tools include atomic batches of up to 100 operations / 200,000 new text
 characters, revision checks and encrypted recovery. New notebooks use distinct
 series titles; extra volumes of existing series are not yet exposed here.
 No delete or automatic history/media cleanup is provided. Text edits preserve
 existing notes, attachments and other fields.
 
+Formatted pages use `read_page_blocks` and `prepare_paragraph_edit`: hash-bound UTF-16 text ranges, exact expected text and typed normal/title/heading/bullet/quote styles. Untouched markup, inline styles, notes and media remain unchanged; inserted text inherits the first affected run. Legacy `replace` refuses rich HTML. Nested blocks and ranges removing line breaks are explicitly unsupported.
+
+Local processing does not make the chat offline. Authorised extracts go to the MCP host and may reach its provider. The connector cannot control host networking or retention; verified local/offline client and model are required for private offline use. Revocation cannot withdraw already delivered extracts.
+
 ## Validate and save an app-compatible archive
+
+Paragraph styling requires `styleEditable: true` on `div.p` and the Certosa 0.3.8
+frontend. The prior public 0.3.7 frontend cannot display the new styles and may
+strip their attributes on import. Legacy `div`/`p` text remains editable. Native
+archive roundtrip verification is separate from rendering/import behavior in
+older frontends.
 
 1. Read back committed changes.
 2. Call `validate_archive`: schema, media checksums/references, legacy size

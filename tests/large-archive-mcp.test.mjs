@@ -15,7 +15,7 @@ const checks=[],transcript=[];function check(label,value){assert.ok(value,label)
 async function call(name,args={}){const response=await client.callTool({name,arguments:args});const value=JSON.parse(response.content[0].text);transcript.push({name,arguments:args,result:value});return value;}
 async function until(predicate){for(let i=0;i<200;i++){const value=await call('get_archive_status');if(predicate(value))return value;await new Promise(resolve=>setTimeout(resolve,25));}throw Error('STATE_TIMEOUT');}
 try{
-  await client.connect(transport);check('SDK exposes seventeen archive/complex edit/validation tools',(await client.listTools()).tools.length===17);
+  await client.connect(transport);check('SDK exposes nineteen archive/complex edit/validation tools',(await client.listTools()).tools.length===19);
   check('initialisation teaches archive recognition and local password handling',client.getInstructions()?.includes('.certosa')&&client.getInstructions()?.includes('NEVER ask for a password'));
   check('portable prompts and format resource are discoverable',(await client.listPrompts()).prompts.length===2&&(await client.listResources()).resources[0].uri==='certosa://archive-workflow');
   check('import starts local selection without password/path arguments',(await call('import_archive')).state==='awaiting_file_selection');
@@ -24,6 +24,11 @@ try{
   try{check('uncertain executor outcomes explicitly forbid automatic retries',(await call('count_word',{word:'cosa'})).error==='OUTCOME_UNKNOWN_DO_NOT_RETRY');}finally{service.controller.call=dispatch;}
   check('only owner-selected non-secret notebooks available',(await call('list_notebooks')).items.length===2);
   check('exact count spans authorised notebooks',(await call('count_word',{word:'cosa'})).total===6);
+  const blocks=await call('read_page_blocks',{notebookId:'first',pageNumber:1,limit:1});
+  const paragraph=await call('prepare_paragraph_edit',{notebookId:'first',pageNumber:1,baseRevision:blocks.revision,operations:[{blockIndex:0,blockHash:blocks.blocks[0].blockHash,style:'quote',textEdits:[{start:0,end:4,expectedText:'Cosa',text:'Idea'}]}]});
+  check('incremental formatted edit has an exact preview',(await call('read_proposal',{proposalId:paragraph.id})).operations[0].changes[0].afterText.startsWith('Idea'));
+  check('incremental formatted edit saves with recovery',(await call('apply_proposal',{proposalId:paragraph.id})).checkpoint===true);
+  check('incremental paragraph style is readable',(await call('read_page_blocks',{notebookId:'first',pageNumber:1})).blocks[0].style==='quote');
   const before=await call('read_notebook',{notebookId:'first',startPage:1,limit:1});
   const author=await call('prepare_author_edit',{notebookId:'first',baseRevision:before.revision,author:'Autore tramite MCP'});
   check('author preview has no edition/illustrator side effects',author.operations.length===1&&author.operations[0].type==='set_notebook_author');

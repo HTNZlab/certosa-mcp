@@ -7,8 +7,8 @@ import {ArchiveRouter} from '../src/archive-router.mjs';
 import {LargeArchiveStore} from '../src/large-archive-store.mjs';
 import {validateCompatiblePack,verifyNativeExport} from '../src/archive-validation.mjs';
 import {fixture,packFixture,project} from './archive-fixtures.mjs';
-const root=path.join(project,'verifiche/installable-connector-20261101','workflow-'+Date.now());fs.mkdirSync(root,{recursive:true});let serial=0;
-async function setup(large=true,allowCreate=true){const runtime=path.join(root,String(++serial));fs.mkdirSync(runtime);const router=new ArchiveRouter({project:root,runtime});if(large){router.large.adopt(LargeArchiveStore.create(path.join(runtime,'test.certosa-db'),randomBytes(24).toString('hex'),packFixture()));router.active=router.large;}else{const f=await fixture(runtime);await router.unlock(f.file,f.password);}router.grant({notebookIds:['first','second'],write:true,allowCreate});return router;}
+const root=path.join(process.env.CERTOSA_TEST_OUTPUT_ROOT||path.join(project,'verifiche/installable-connector-20261101'),'workflow-'+Date.now());fs.mkdirSync(root,{recursive:true});let serial=0;
+async function setup(large=true,allowCreate=true,notebookIds=['first','second']){const runtime=path.join(root,String(++serial));fs.mkdirSync(runtime);const router=new ArchiveRouter({project:root,runtime});if(large){router.large.adopt(LargeArchiveStore.create(path.join(runtime,'test.certosa-db'),randomBytes(24).toString('hex'),packFixture()));router.active=router.large;}else{const f=await fixture(runtime);await router.unlock(f.file,f.password);}router.grant({notebookIds,write:true,allowCreate});return router;}
 const batch=(r,operations)=>r.call('prepare_archive_edit',{baseRevision:r.status().revision,operations});
 const page=(id,n,text)=>({type:'edit_page',notebookId:id,pageNumber:n,mode:'append',text});
 for(const large of [false,true])test('atomic complex edits and creations retain notes/media and export through native reader: '+(large?'incremental':'legacy'),async()=>{
@@ -44,8 +44,6 @@ test('native application import planner rejects conflicting volume metadata',asy
  const r=await setup();try{await assert.rejects(()=>batch(r,[{type:'create_notebook',notebookId:'duplicate-title',title:'Usi Interessanti',pageCapacity:40}]),e=>e.code==='DUPLICATE_SERIES');assert.equal(r.status().revision,0);}finally{r.close();}
 });
 for(const large of [false,true])test('creation-only local grant can add a first notebook without granting existing ones: '+large,async()=>{
- const r=await setup(large);try{r.active.session?.close?.();if(!large)r.active.close();
- if(!large){const f=await fixture(path.join(root,'creation-only-'+serial));await r.unlock(f.file,f.password);}
- r.grant({notebookIds:[],write:true,allowCreate:true});assert.equal((await r.call('list_notebooks',{})).items.length,0);
+ const r=await setup(large,true,[]);try{assert.equal((await r.call('list_notebooks',{})).items.length,0);
  const p=await batch(r,[{type:'create_notebook',notebookId:'first-new',title:'Primo quaderno',pageCapacity:40},page('first-new',1,'Prima pagina.')]);await r.call('apply_proposal',{proposalId:p.id});assert.equal((await r.call('list_notebooks',{})).items.length,1);assert.equal((await r.call('read_notebook',{notebookId:'first-new',startPage:1,limit:1})).pages[0].text,'Prima pagina.');await assert.rejects(()=>r.call('read_notebook',{notebookId:'first'}),e=>e.code==='NOT_FOUND');}finally{r.close();}
 });

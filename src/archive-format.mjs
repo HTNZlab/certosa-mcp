@@ -20,7 +20,7 @@ export function validateArchive(pack){
   const unique=items=>{const seen=new Set();for(const item of items){if(!object(item)||!id(item.id)||seen.has(item.id))fail('INVALID_ARCHIVE');seen.add(item.id);}};
   if(!object(pack)||pack.formato!=='certosa/2'||!object(pack.lib))fail('INVALID_ARCHIVE');
   const lib=pack.lib;
-  if(!Array.isArray(lib.series)||!Array.isArray(lib.notebooks)||lib.series.length>10000||lib.notebooks.length>10000)fail('INVALID_ARCHIVE');
+  if(lib._pageStore||!Array.isArray(lib.series)||!Array.isArray(lib.notebooks)||lib.series.length>10000||lib.notebooks.length>10000)fail('INVALID_ARCHIVE');
   unique(lib.series);unique(lib.notebooks);
   const series=new Set(lib.series.map(s=>s.id));
   if(lib.series.some(s=>typeof s.label!=='string'||!s.label.trim()||s.label.length>10000))fail('INVALID_ARCHIVE');
@@ -29,7 +29,7 @@ export function validateArchive(pack){
     if(!object(n)||!id(n.id)||!id(n.sid)||active&&!series.has(n.sid)||!Array.isArray(n.pages)||!Number.isSafeInteger(n.maxPages)||n.maxPages<1||n.maxPages>10000||n.pages.length>n.maxPages+1||(total+=n.pages.length)>100000)fail('INVALID_ARCHIVE');
     for(const p of n.pages){
       if(p==null)continue;
-      if(!object(p)||p.html!==undefined&&typeof p.html!=='string')fail('INVALID_ARCHIVE');
+      if(!object(p)||p.$page||p.html!==undefined&&typeof p.html!=='string')fail('INVALID_ARCHIVE');
       for(const field of ['notes','st'])if(p[field]!==undefined&&!Array.isArray(p[field]))fail('INVALID_ARCHIVE');
       if((p.notes?.length||0)>10000||(p.st?.length||0)>10000)fail('INVALID_ARCHIVE');
       for(const note of p.notes||[])if(!object(note)||typeof note.id!=='string'||note.html!==undefined&&typeof note.html!=='string')fail('INVALID_ARCHIVE');

@@ -21,7 +21,7 @@ function fixture(options={}){
  const owner=createLocalNotebookTools({readState:()=>state,plainText:v=>v,searchEntries,
   isSystemNotebook:n=>n.id==='manual',now:()=>clock,newId:()=>`proposal-${++id}`,...options});
  const session=owner.openSession({archiveId:state.archiveId,notebookIds:['allowed','manual'],permissions:['read','search','propose_create','propose_edit']});
- return {state,owner,session,tick:()=>{clock+=900001;}};
+ return {state,owner,session,tick:()=>{clock+=1800001;}};
 }
 const code=(fn,expected)=>assert.throws(fn,e=>e.code===expected);
 

@@ -7,7 +7,7 @@ import {archiveError} from './archive-format.mjs';
 // The only password channel is an anonymous local pipe, consumed here. Never a
 // command argument, disk file, HTTP response, MCP message, stderr or diagnostic.
 export class LocalArchiveUI{
-  constructor({runtime}){this.runtime=runtime;this.child=null;}
+  constructor({runtime}){this.runtime=runtime;this.child=null;this.cancelPending=null;}
   ask(mode,input){
     if(process.platform!=='win32')return Promise.reject(archiveError('LOCAL_UNLOCK_UNSUPPORTED'));
     if(this.child)return Promise.reject(archiveError('LOCAL_DIALOG_BUSY'));
@@ -20,18 +20,20 @@ export class LocalArchiveUI{
         stdio:['pipe','pipe','pipe'],windowsHide:false
       });
       this.child=child;let output=[],length=0,settled=false;
-      const finish=(error,value)=>{if(settled)return;settled=true;this.child=null;for(const chunk of output)chunk.fill(0);output=[];error?reject(error):resolve(value);};
+      const finish=(error,value)=>{if(settled)return;settled=true;if(this.child===child){this.child=null;this.cancelPending=null;}for(const chunk of output)chunk.fill(0);output=[];error?reject(error):resolve(value);};
+      this.cancelPending=()=>{finish(archiveError('CANCELLED'));child.kill();};
       child.stderr.resume();child.stdin.on('error',()=>{});
-      child.stdout.on('data',chunk=>{length+=chunk.length;if(length>1024*1024){child.kill();finish(archiveError('LOCAL_DIALOG_UNAVAILABLE'));}else output.push(chunk);});
+      child.stdout.on('data',chunk=>{if(settled){chunk.fill(0);return;}length+=chunk.length;if(length>1024*1024){chunk.fill(0);child.kill();finish(archiveError('LOCAL_DIALOG_UNAVAILABLE'));}else output.push(chunk);});
       child.on('error',()=>finish(archiveError('LOCAL_DIALOG_UNAVAILABLE')));
       child.on('close',code=>{
+        if(settled)return;
         try{const value=JSON.parse(Buffer.concat(output).toString('utf8').replace(/^\uFEFF/,''));if(code||value.error)finish(archiveError('LOCAL_DIALOG_UNAVAILABLE'));else finish(null,value);}
         catch{finish(archiveError('LOCAL_DIALOG_UNAVAILABLE'));}
       });
       child.stdin.end(JSON.stringify(input));
     });
   }
-  cancel(){this.child?.kill();}
+  cancel(){this.cancelPending?.();}
   notice(code){
     const messages={
       ARCHIVE_OUTSIDE_PROJECT:'Scegli un file .certosa nella cartella di progetto configurata. Il file selezionato non e stato modificato.',

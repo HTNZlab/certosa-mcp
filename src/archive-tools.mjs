@@ -1,8 +1,10 @@
 import fs from 'node:fs';
+import {paragraphTools} from './paragraph-tools.mjs';
 const base=JSON.parse(fs.readFileSync(new URL('../tools.json',import.meta.url),'utf8')).tools;
 const empty={type:'object',properties:{},additionalProperties:false};
 const annotations=readOnly=>({readOnlyHint:readOnly,destructiveHint:false,idempotentHint:readOnly,openWorldHint:false});
 export const archiveTools=[
+  ...paragraphTools,
   {name:'get_archive_capabilities',title:'Recognise Certosa files and available workflows',description:'Describe .certosa/CRTS2 and .certosa-db, local password handling, compatible saving and operation limits. Does not scan disk or expose content.',inputSchema:empty,annotations:annotations(true)},
   {name:'validate_archive',title:'Validate a compatible Certosa archive',description:'Check the unlocked full archive locally: schema, media checksums and attachment references. Returns no notebook content. Oversized incremental archives report that legacy export limits are exceeded; never truncate. Final export also verifies the original Certosa native reader.',inputSchema:empty,annotations:annotations(true)},
   {name:'prepare_archive_edit',title:'Prepare an atomic multi-page and notebook change',description:'Preview up to 100 edits, author/font/capacity updates and new notebooks at a single revision. Page edits preserve notes/media. Creation requires the separate local creation grant. Nothing is saved until the proposal is reviewed/applied once. IDs are notebook identifiers, never filesystem paths.',inputSchema:{type:'object',additionalProperties:false,required:['baseRevision','operations'],properties:{baseRevision:{type:'integer',minimum:0},operations:{type:'array',minItems:1,maxItems:100,items:{oneOf:[

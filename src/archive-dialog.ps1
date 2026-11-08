@@ -45,6 +45,7 @@ try {
     $form.Height=570;$label.Height=205;$ok.Top=475;$cancel.Top=475
     $label.Text=if($data.encrypted){"Sblocca $($data.name).`r`nLa password viene usata soltanto sul dispositivo. Non viene inviata alla chat."}else{"$($data.name) non e protetto.`r`nScegli una password per cifrare i prossimi salvataggi nel formato Certosa attuale."}
     if($data.exporting){$label.Text="Scegli la password della copia .certosa esportata.`r`nLa password resta sul dispositivo. Il file completo non viene mostrato alla chat."}
+    if($data.creating){$label.Text="Crea $($data.name).`r`nScegli una password di almeno 8 caratteri e ripetila. Servira a ogni apertura della biblioteca.`r`nLa password resta sul dispositivo e non viene inviata alla chat."}
     if($data.importing){$label.Text+="`r`nCreo una copia incrementale .certosa-db, con questa password. L'originale non viene modificato."}
     if($data.copyTo){$label.Text+="`r`nCopia di lavoro cifrata in $($data.copyTo). L'originale resta al suo posto."}
     if($data.retry){$label.Text+="`r`nSblocco non riuscito: controlla la password e riprova."}
@@ -57,26 +58,27 @@ try {
       $hint=New-Object System.Windows.Forms.Label;$hint.Text='Ripeti la password';$hint.SetBounds(20,295,520,25)
       $form.Controls.AddRange(@($hint,$repeat))
     }
-    $ok.Text='Sblocca in locale';$ok.Enabled=$false
-    $validate={ $ok.Enabled=$box.Text.Length -gt 0 -and ($data.encrypted -or $box.Text -ceq $repeat.Text) }
+    $ok.Text=if($data.creating){'Crea biblioteca cifrata'}else{'Sblocca in locale'};$ok.Enabled=$false
+    $validate={ $minimum=if($data.creating){8}else{1};$ok.Enabled=$box.Text.Length -ge $minimum -and ($data.encrypted -or $box.Text -ceq $repeat.Text) }
     $box.Add_TextChanged($validate);$repeat.Add_TextChanged($validate)
     $form.Add_Shown({$box.Focus()})
     if($form.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK){Reply @{password=$box.Text}}else{Reply @{cancelled=$true}}
     $box.Clear();$repeat.Clear();$form.Dispose();exit
   }
-  $label.Text="Scegli i quaderni accessibili alla chat per 15 minuti.`r`nGli estratti richiesti saranno leggibili dalla chat. Deseleziona i quaderni con password o altri segreti; quelli classificati riservati sono gia esclusi."
+  $label.Text="Scegli i quaderni accessibili alla chat. Il consenso scade dopo 30 minuti di inattivita; ogni utilizzo riuscito rinnova l’attesa. Puoi revocarlo quando vuoi.`r`nGli estratti scelti passano alla chat e possono arrivare al suo fornitore. Certosa non controlla invii e conservazione di questi servizi.`r`nPer tenere i dati sul dispositivo usa una chat e un modello locali verificati offline.`r`nEscludi quaderni con password o altri segreti; quelli classificati riservati sono gia esclusi."
+  $label.Height=190
   $all=New-Object System.Windows.Forms.CheckBox
-  $all.Text='Seleziona tutti i quaderni disponibili';$all.SetBounds(20,125,520,28)
+  $all.Text='Seleziona tutti i quaderni disponibili';$all.SetBounds(20,210,520,28)
   $list=New-Object System.Windows.Forms.CheckedListBox
-  $list.SetBounds(20,158,520,140);$list.CheckOnClick=$true
+  $list.SetBounds(20,243,520,130);$list.CheckOnClick=$true
   foreach($notebook in $data.notebooks){$entry=$notebook.title+' · '+$notebook.volume;if($notebook.author){$entry+=' — '+$notebook.author};[void]$list.Items.Add($entry,$false)}
   $all.Add_CheckedChanged({for($i=0;$i -lt $list.Items.Count;$i++){$list.SetItemChecked($i,$all.Checked)}})
   $write=New-Object System.Windows.Forms.CheckBox
-  $write.Text='Consenti anche le modifiche con copia di recupero cifrata';$write.SetBounds(20,305,520,30);$write.Checked=$true
-  $form.Height=490;$ok.Top=395;$cancel.Top=395
+  $write.Text='Consenti anche le modifiche con copia di recupero cifrata';$write.SetBounds(20,380,520,30);$write.Checked=$true
+  $form.Height=560;$ok.Top=465;$cancel.Top=465
   $create=New-Object System.Windows.Forms.CheckBox
-  $create.Text='Consenti anche la creazione di nuovi quaderni';$create.SetBounds(20,340,520,30);$create.Checked=$false
-  $ok.Text='Autorizza per 15 minuti';$ok.Enabled=$false
+  $create.Text='Consenti anche la creazione di nuovi quaderni';$create.SetBounds(20,415,520,30);$create.Checked=$false
+  $ok.Text='Autorizza · 30 min inattivi';$ok.Enabled=$false
   $list.Add_ItemCheck({param($sender,$eventArgs) $count=$list.CheckedItems.Count;if($eventArgs.NewValue -eq [System.Windows.Forms.CheckState]::Checked){$count++}else{$count--};$ok.Enabled=$count -gt 0 -or ($write.Checked -and $create.Checked)})
   $refreshGrant={$create.Enabled=$write.Checked;$ok.Enabled=$list.CheckedItems.Count -gt 0 -or ($write.Checked -and $create.Checked)}
   $create.Add_CheckedChanged($refreshGrant);$write.Add_CheckedChanged($refreshGrant)

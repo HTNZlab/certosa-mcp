@@ -7,7 +7,7 @@ import {projectDirectory} from './archive-paths.mjs';
 const projectArg=process.argv[2];
 if(!projectArg||!path.isAbsolute(projectArg))throw Error('ABSOLUTE_ARCHIVE_PROJECT_REQUIRED');
 const project=fs.realpathSync(projectArg);
-const runtime=projectDirectory(project,path.join(project,'.certosa-connectors','0.0.5-alpha.1'));
+const runtime=projectDirectory(project,path.join(project,'.certosa-connectors','0.0.6-alpha.3'));
 for(const name of ['.tmp','cache-node','logs','backups','archives'])projectDirectory(project,path.join(runtime,name));
 for(const key of ['TEMP','TMP','TMPDIR'])process.env[key]=path.join(runtime,'.tmp');
 process.env.NODE_COMPILE_CACHE=path.join(runtime,'cache-node');

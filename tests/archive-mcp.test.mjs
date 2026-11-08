@@ -7,11 +7,12 @@ import {Client} from '../node_modules/@modelcontextprotocol/sdk/dist/esm/client/
 import {StdioClientTransport} from '../node_modules/@modelcontextprotocol/sdk/dist/esm/client/stdio.js';
 import {createArchiveService} from '../src/archive-service.mjs';
 import {unlockArchiveBytes} from '../src/archive-format.mjs';
-import {fixture,project,native} from './archive-fixtures.mjs';
+import {fixture,packFixture,project,native} from './archive-fixtures.mjs';
 
 const root=path.join(project,'verifiche/archive-engine-20261101','mcp-'+Date.now());fs.mkdirSync(root,{recursive:true});
 const config=path.join(root,'archive-engine.json');fs.writeFileSync(config,JSON.stringify({project:root,port:0}));
-const data=await fixture(path.join(root,'archive'));let unlockResolve,grantResolve,grantInput;
+const syntheticPack=packFixture();syntheticPack.lib.notebooks[0].pages[1].html=syntheticPack.lib.notebooks[0].pages[1].html.replace('<div>','<div class="p">');
+const data=await fixture(path.join(root,'archive'),syntheticPack);let unlockResolve,grantResolve,grantInput;
 const ui={cancel(){},async ask(mode,input){if(mode==='choose')return {path:data.file};if(mode==='unlock')return new Promise(resolve=>unlockResolve=resolve);grantInput=input;return new Promise(resolve=>grantResolve=resolve);}};
 const service=await createArchiveService({filename:config,ui});const checks=[],transcript=[];let client;
 function check(label,condition){assert.ok(condition,label);checks.push(label);console.log('PASS '+label);}
@@ -22,7 +23,7 @@ async function connect(){
 async function call(name,args={}){const result=await client.callTool({name,arguments:args});const value=JSON.parse(result.content[0].text);transcript.push({name,arguments:args,result:value});return value;}
 async function until(phase){for(let i=0;i<100;i++){const state=await call('get_archive_status');if(state.state===phase)return state;await new Promise(resolve=>setTimeout(resolve,20));}throw Error('STATE_TIMEOUT');}
 try{
-  client=await connect();check('fourteen archive tools exposed by the actual SDK',(await client.listTools()).tools.length===17);
+  client=await connect();check('nineteen archive tools exposed by the actual SDK',(await client.listTools()).tools.length===19);
   const schemas=(await client.listTools()).tools;check('no password or filesystem path accepted by open tool',Object.keys(schemas.find(t=>t.name==='open_archive').inputSchema.properties).length===0);
   check('archive initially closed',(await call('get_archive_status')).state==='closed');
   check('closed archive cannot be read',(await call('list_notebooks')).error==='ARCHIVE_LOCKED');
@@ -36,6 +37,13 @@ try{
   check('exact whole-archive count includes both notebooks',(await call('count_word',{word:'cosa'})).total===6);
   check('native search engine finds a note',(await call('search_notebooks',{query:'annotata'})).hits[0].kind==='note');
   check('secret notebook cannot be read',(await call('read_notebook',{notebookId:'reserved'})).error==='NOT_FOUND');
+  const blocks=await call('read_page_blocks',{notebookId:'first',pageNumber:1,limit:1});
+  check('structured reader returns editable hashes and no raw HTML',blocks.blocks[0].editable&&blocks.blocks[0].blockHash.length===64&&!JSON.stringify(blocks).includes('<b>'));
+  check('legacy rich replacement is explicitly refused',(await call('prepare_edit',{notebookId:'first',pageNumber:1,baseRevision:blocks.revision,mode:'replace',text:'flatten'})).error==='RICH_TEXT_REQUIRES_PARAGRAPH_EDIT');
+  const paragraph=await call('prepare_paragraph_edit',{notebookId:'first',pageNumber:1,baseRevision:blocks.revision,operations:[{blockIndex:0,blockHash:blocks.blocks[0].blockHash,style:'heading',textEdits:[{start:0,end:4,expectedText:'Cosa',text:'Idea'}]}]});
+  check('structured proposal reviewed through SDK',(await call('read_proposal',{proposalId:paragraph.id})).operations[0].changes[0].afterText.startsWith('Idea'));
+  check('structured edit commits through SDK with recovery',(await call('apply_proposal',{proposalId:paragraph.id})).checkpoint===true);
+  check('structured edit readback retains heading',(await call('read_page_blocks',{notebookId:'first',pageNumber:1})).blocks[0].style==='heading');
   const read=await call('read_notebook',{notebookId:'first',startPage:3,limit:1});
   const text='Traduction française de la bibliothèque. Une chose importante.';
   const proposal=await call('prepare_edit',{notebookId:'first',pageNumber:3,baseRevision:read.revision,mode:'append',text,provenance:{kind:'chat',reference:'Synthetic archive-engine test'}});

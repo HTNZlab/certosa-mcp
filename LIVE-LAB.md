@@ -1,5 +1,17 @@
 # Biblioteca di prova collegata alla chat
 
+Aggiornamento dei sorgenti, 8 novembre 2026: l'adattatore browser ora usa 30 minuti
+di inattività, rinnovati dall'uso autorizzato riuscito; il polling non rinnova il
+consenso. Il pulsante è «Collega · 30 min inattivi». Queste modifiche non sono
+state installate nel laboratorio già preparato. Le istruzioni seguenti sono
+storiche e descrivono il launcher e il consenso di allora.
+
+Limite del laboratorio browser: la revoca è controllata prima di avviare il
+salvataggio, ma non annulla un `Store.save` già entrato nella cifratura asincrona.
+Il veto prima della pubblicazione verificato per i motori archivio non qualifica
+questo vecchio percorso live. Per estenderlo serve una guardia nel salvataggio
+del frontend, da collaudare separatamente.
+
 Versione 0.0.2-alpha.3, 1 novembre 2026. Laboratorio locale funzionante, distinto
 dalla PWA pubblica e dalle integrazioni negli account ChatGPT, Claude e Grok.
 

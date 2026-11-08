@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import {randomUUID} from 'node:crypto';
 import {archiveError} from './archive-format.mjs';
 import {plainText,textHtml} from './archive-text.mjs';
+import {assertPlainReplaceSafe,createIdleConsent,DEFAULT_IDLE_TTL_MS} from './notebook-tools.mjs';
 import search from './archive-search.mjs';
 import {LargeArchiveStore,isSystemNotebook,isSecretNotebook} from './large-archive-store.mjs';
 
@@ -14,25 +15,29 @@ export class LargeArchiveEngine{
     let stat;try{stat=fs.statSync(this.filename);}catch{fail('ARCHIVE_PATH_CHANGED');}
     if([stat.dev,stat.ino,stat.birthtimeMs].join(':')!==this.identity)fail('ARCHIVE_PATH_CHANGED');
   }
-  grant({notebookIds,write=false,ttlMs=900000,allowCreate=false}){
+  runUse(fn){if(!this.session||!this.idleConsent)fail('ARCHIVE_LOCKED');return this.idleConsent.run(()=>{this.check();return fn();});}
+  grant({notebookIds,write=false,ttlMs=DEFAULT_IDLE_TTL_MS,allowCreate=false}){
     if(!this.store)fail('ARCHIVE_LOCKED');
-    if(!Number.isSafeInteger(ttlMs)||ttlMs<1||ttlMs>900000)fail('INVALID_GRANT');
+    if(this.session){this.idleConsent.check();fail('ARCHIVE_IN_USE');}
+    if(!Number.isSafeInteger(ttlMs)||ttlMs<1||ttlMs>DEFAULT_IDLE_TTL_MS)fail('INVALID_GRANT');
     const eligible=new Set(this.store.books().filter(n=>!isSystemNotebook(n)&&!isSecretNotebook(n)).map(n=>n.id));
     if(!Array.isArray(notebookIds)||!notebookIds.length&&!(write&&allowCreate)||notebookIds.some(id=>!eligible.has(id)))fail('INVALID_GRANT');
-    this.checkIdentity();this.session={ids:new Set(notebookIds),write,expiresAt:this.now()+ttlMs};return this.status();
+    this.checkIdentity();this.idleConsent?.close();++this.epoch;this.proposals.clear();
+    const consent=createIdleConsent({ttlMs,now:this.now,onExpire:()=>{if(this.idleConsent===consent)this.close();}});this.idleConsent=consent;
+    this.session={ids:new Set(notebookIds),write};Object.defineProperty(this.session,'expiresAt',{enumerable:true,get:()=>consent.expiresAt,set:value=>{consent.expiresAt=value;}});return this.status();
   }
   status(){
-    if(this.session&&this.now()>=this.session.expiresAt)this.close();
+    if(this.session)try{this.idleConsent.check();}catch{this.close();}
     return {state:this.session?'ready':this.store?'awaiting_consent':'closed',backend:this.store?'incremental':undefined,archiveId:this.session?this.store.archiveId:undefined,
       notebookCount:this.session?this.session.ids.size:0,writeAllowed:!!this.session?.write,revision:this.session?this.store.revision:undefined,expiresAt:this.session?.expiresAt};
   }
   check(write=false){
     if(!this.session||!this.store)fail('ARCHIVE_LOCKED');
-    if(this.now()>=this.session.expiresAt){this.close();fail('SESSION_CLOSED');}
+    this.idleConsent.check();
     if(write&&!this.session.write)fail('FORBIDDEN');this.checkIdentity();return this.store.revision;
   }
   book(id){const book=this.store.book(id);if(!book||!this.session.ids.has(id)||isSystemNotebook(book)||isSecretNotebook(book))fail('NOT_FOUND');return book;}
-  metadata(book,revision=this.store.revision){return {archiveId:this.store.archiveId,notebookId:book.id,seriesId:book.sid,title:this.store.title(book),author:this.store.author(book),volume:book.vol,pageCapacity:book.maxPages,revision};}
+  metadata(book,revision=this.store.revision){return {archiveId:this.store.archiveId,notebookId:book.id,seriesId:book.sid,title:this.store.title(book),author:this.store.author(book),volume:book.vol,pageCapacity:book.maxPages,pagination:['continuous','fixed'].includes(book.pagination)?book.pagination:'independent',storage:'incremental',revision};}
   eligible(){return this.store.books().filter(n=>this.session.ids.has(n.id)&&!isSystemNotebook(n)&&!isSecretNotebook(n));}
   assertRevision(revision,epoch=this.epoch){if(epoch!==this.epoch)fail('SESSION_CLOSED');if(this.check()!==revision)fail('REVISION_CONFLICT');}
   read({notebookId,startPage=1,limit=10}){
@@ -58,6 +63,7 @@ export class LargeArchiveEngine{
     const revision=this.check(),epoch=this.epoch;
     if(typeof query!=='string'||query.length>240||!Number.isSafeInteger(limit)||limit<1||limit>50)fail('INVALID_QUERY');
     const parsed=search.parse(query);if(parsed.error)fail('INVALID_QUERY');
+    this.store.ensureSearchIndex();
     const ids=this.eligible().map(n=>n.id),match=parsed.positives.some(group=>/[^\u0000-\u024f]/u.test(group.value))?null:parsed.positives.map(group=>'"'+group.value.replaceAll('"','""')+'"').join(' AND ');
     let after=0,best=[];
     while(true){
@@ -71,6 +77,7 @@ export class LargeArchiveEngine{
   count({word,notebookId,caseSensitive=false}){
     const revision=this.check();if(typeof word!=='string'||word.length>100||!/^\p{L}[\p{L}\p{N}\p{M}]*$/u.test(word))fail('INVALID_WORD');
     if(notebookId)this.book(notebookId);
+    this.store.ensureSearchIndex();
     const target=caseSensitive?word.normalize('NFKC'):word.normalize('NFKC').toLocaleLowerCase('it');
     const ids=this.eligible().filter(n=>!notebookId||n.id===notebookId).map(n=>n.id),locations=new Map();let total=0,after=0;
     // Count bounded text batches, never media. This retains the exact Unicode
@@ -94,14 +101,14 @@ export class LargeArchiveEngine{
     }else{
       if(!Number.isSafeInteger(args.pageNumber)||args.pageNumber<1||args.pageNumber>book.maxPages)fail('INVALID_PAGE');
       if(typeof args.text!=='string'||args.text.length>100000||!['append','replace'].includes(args.mode))fail('INVALID_EDIT');
-      const before=plainText(this.store.page(book.id,args.pageNumber)?.html||'');
+      const beforeHtml=this.store.page(book.id,args.pageNumber)?.html||'';if(args.mode==='replace')assertPlainReplaceSafe(beforeHtml);const before=plainText(beforeHtml);
       op={type:'edit_page',notebookId:book.id,pageNumber:args.pageNumber,mode:args.mode,beforeText:before,afterText:args.mode==='append'?before+args.text:args.text,source:args.provenance};
     }
     const proposal={id:randomUUID(),archiveId:this.store.archiveId,baseRevision:revision,status:'proposal_only',expiresAt:this.session.expiresAt,operations:[op]};this.proposals.set(proposal.id,structuredClone(proposal));return proposal;
   }
   proposal({proposalId}){
     const revision=this.check(),value=this.proposals.get(proposalId);if(!value)fail('NOT_FOUND');for(const op of value.operations)this.book(op.notebookId);
-    return {...structuredClone(value),stale:value.baseRevision!==revision,currentRevision:revision};
+    return {...structuredClone(value),expiresAt:this.session.expiresAt,stale:value.baseRevision!==revision,currentRevision:revision};
   }
   apply({proposalId}){
     this.check(true);if(this.applied.has(proposalId))fail('HANDLE_SPENT');const proposal=this.proposal({proposalId});if(proposal.stale)fail('REVISION_CONFLICT');
@@ -110,15 +117,18 @@ export class LargeArchiveEngine{
       if(this.store.author(this.book(op.notebookId))!==op.beforeAuthor)fail('REVISION_CONFLICT');change={author:op.afterAuthor};
     }else{
       const page=this.store.page(op.notebookId,op.pageNumber)||{html:'',st:[],notes:[]};if(plainText(page.html||'')!==op.beforeText)fail('REVISION_CONFLICT');
-      page.html=op.mode==='append'?(page.html||'')+textHtml(op.afterText.slice(op.beforeText.length)):textHtml(op.afterText);if(op.source)page.connectorSource=op.source;change={pageNumber:op.pageNumber,pageValue:page};
+      if(op.mode==='replace')assertPlainReplaceSafe(page.html||'');page.html=op.mode==='append'?(page.html||'')+textHtml(op.afterText.slice(op.beforeText.length)):textHtml(op.afterText);if(op.source)page.connectorSource=op.source;change={pageNumber:op.pageNumber,pageValue:page};
     }
     this.applied.add(proposalId);
     try{
-      const saved=this.store.commit({baseRevision:proposal.baseRevision,notebookId:op.notebookId,...change,expires:()=>!this.session||this.now()>=this.session.expiresAt});
+      const consent=this.idleConsent,saved=this.store.commit({baseRevision:proposal.baseRevision,notebookId:op.notebookId,...change,expires:()=>!this.session||this.idleConsent!==consent||consent.closed});
       return {status:'saved',backend:'incremental',archiveId:this.store.archiveId,notebookId:op.notebookId,pageNumber:op.pageNumber,revision:saved.revision,checkpoint:true,checkpointId:saved.checkpointId};
     }catch(e){if(['REVISION_CONFLICT','SESSION_CLOSED'].includes(e.code))throw e;fail('SAVE_FAILED');}
   }
   async call(name,args={}){
+    return this.runUse(()=>this.dispatch(name,args));
+  }
+  dispatch(name,args={}){
     this.check();
     if(name==='list_notebooks'){
       const {offset=0,limit=50}=args;if(!Number.isSafeInteger(offset)||offset<0||offset>10000||!Number.isSafeInteger(limit)||limit<1||limit>100)fail('INVALID_RANGE');
@@ -127,5 +137,5 @@ export class LargeArchiveEngine{
     if(name==='read_notebook')return this.read(args);if(name==='search_notebooks')return this.search(args);if(name==='count_word')return this.count(args);
     if(name==='prepare_edit'||name==='prepare_author_edit')return this.prepare(name,args);if(name==='read_proposal')return this.proposal(args);if(name==='apply_proposal')return this.apply(args);fail('INVALID_TOOL_OR_ARGUMENTS');
   }
-  close(){++this.epoch;this.session=null;this.proposals.clear();this.applied.clear();this.store?.close();this.store=null;this.filename=null;}
+  close(){++this.epoch;this.idleConsent?.close();this.idleConsent=null;this.session=null;this.proposals.clear();this.applied.clear();this.store?.close();this.store=null;this.filename=null;}
 }

@@ -1,4 +1,34 @@
-# Certosa MCP: GitHub pubblico e submission
+# Certosa MCP: download ufficiali e cataloghi
+
+## 0.0.6-alpha.3 — pacchetti per la distribuzione, 8 novembre 2026
+
+Download ufficiali: [MCPB Windows](https://certosa.htnzlab.it/downloads/mcp/0.0.6-alpha.3/certosa-archives-0.0.6-alpha.3-windows.mcpb),
+[ZIP portatile](https://certosa.htnzlab.it/downloads/mcp/0.0.6-alpha.3/certosa-archives-0.0.6-alpha.3-windows-portable.zip),
+[sorgenti](https://certosa.htnzlab.it/downloads/mcp/0.0.6-alpha.3/certosa-mcp-0.0.6-alpha.3-source.zip) e
+[SHA256SUMS](https://certosa.htnzlab.it/downloads/mcp/0.0.6-alpha.3/SHA256SUMS).
+
+Pacchetti Windows x64 con dipendenze bloccate, manifest e checksum. Correzioni:
+testo Unicode non valido rifiutato prima della proposta, riapertura immediata dopo
+annullamento della finestra locale, richieste del processo disconnesso concluse
+senza interferire con la sessione successiva, ricerca che separa i paragrafi e
+aggiornamento atomico del solo indice locale negli archivi incrementali esistenti.
+La compatibilità di export include i tipi MIME accettati dal decoder dell'app;
+il ripristino di PDF e WAV conserva bytes e metadati supportati con Certosa 0.3.8.
+Restano 19 strumenti e consenso di
+30 minuti di inattività. Per gli stili serve Certosa 0.3.8.
+
+Release GitHub aggiornata: [v0.0.6-alpha.3](https://github.com/HTNZlab/certosa-mcp/releases/tag/v0.0.6-alpha.3).
+I pacchetti allegati sono identici a quelli sul sito ufficiale. Pubblicare i file
+non equivale a installarli nei client o a inviarli ai cataloghi dei provider.
+
+## Storico — candidata locale 0.0.6-alpha.2, 8 novembre 2026
+
+Sorgenti aggiornati per modifiche dei paragrafi con conservazione di formattazione
+e media, 19 strumenti e consenso di 30 minuti di inattività, rinnovato dall’uso
+autorizzato riuscito. La finestra distingue elaborazione locale e passaggio degli
+estratti alla chat. Nessuna pubblicazione, installazione nei client o submission effettuata per
+questa versione. Le informazioni e le prove di distribuzione che seguono sono
+storiche; non attestano che la candidata locale sia già online.
 
 Requisito owner, 1 novembre 2026: l'adattatore deve avere un repository GitHub
 pubblico autonomo, documentazione e pacchetti installabili; puntiamo anche ai

@@ -10,7 +10,7 @@ import {archiveInstructions,archivePrompts,promptText} from './archive-guidance.
 
 const filename=process.argv[2];if(!filename)throw Error('LOCAL_ARCHIVE_CONFIG_REQUIRED');
 const validators=new Map(archiveTools.map(t=>[t.name,new Ajv().compile(t.inputSchema)]));
-const server=new Server({name:'certosa-archives',version:'0.0.5-alpha.1'},{capabilities:{tools:{},prompts:{},resources:{}},instructions:archiveInstructions});
+const server=new Server({name:'certosa-archives',version:'0.0.6-alpha.3'},{capabilities:{tools:{},prompts:{},resources:{}},instructions:archiveInstructions});
 server.setRequestHandler(ListPromptsRequestSchema,async()=>({prompts:archivePrompts}));
 server.setRequestHandler(GetPromptRequestSchema,async request=>({messages:[{role:'user',content:{type:'text',text:promptText(request.params.name)}}]}));
 server.setRequestHandler(ListResourcesRequestSchema,async()=>({resources:[{uri:'certosa://archive-workflow',name:'Certosa archive recognition and compatible saving',mimeType:'text/plain'}]}));
